@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#F4F5F7" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Dealer" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Dealer Inventory</title>
+  </head>
+  <body>
+    <!--
+      DESIGN CONTRACT (pinned by the owner's reference video, 2026-09-27; no concept roll)
+      THESIS: A dealer's whole day, readable at arm's length by an elderly owner. It refuses the tiny, dense SaaS dashboard the reference normally is.
+      OWN-WORLD: Soft gray canvas #F4F5F7, pure white rounded-2xl cards with hairline #E5E7EB borders and soft shadows, white sidebar with a blue-50 pill for the active page, pill buttons, blue #2563EB accent, green/red change chips, blue gradient line charts, Inter with disambiguated l/I, 18px base.
+      STORY: Open the app, see today at a glance, tap one big task, finish it step by step, get a clear "saved" screen.
+      FIRST VIEWPORT: Greeting and date; four large task buttons (New order in solid blue); today's numbers as reference-style stat cards; late payers in red.
+      FORM: Reference dashboard world, scaled for older eyes; pinned by the user, so no seed key.
+      FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
+    -->
+    <div id="root"></div>
+    <div id="print-root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

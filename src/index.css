@@ -1,0 +1,180 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+
+@theme {
+  --font-sans:
+    "Inter Variable", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* Reference world: soft gray canvas, white cards, one blue accent. */
+  --color-canvas: #f4f5f7;
+  --color-line: #e5e7eb;
+  --color-line-strong: #d1d5db;
+  --color-ink: #111827;
+  --color-ink-2: #374151;
+  --color-ink-3: #4b5563;
+  --color-brand: #2563eb;
+  --color-brand-strong: #1d4ed8;
+  --color-brand-soft: #eef3ff;
+
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 4px 12px rgb(16 24 40 / 0.04);
+  --shadow-pop: 0 16px 40px rgb(16 24 40 / 0.14), 0 2px 8px rgb(16 24 40 / 0.06);
+}
+
+/* Text size setting. Every size and spacing is in rem, so the whole app
+   scales together. Normal is 18px, larger than the usual 16px on purpose. */
+html {
+  font-size: 112.5%;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+html[data-text-size="large"] {
+  font-size: 125%;
+}
+html[data-text-size="xl"] {
+  font-size: 137.5%;
+}
+
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  /* Inter's tailed l and serifed I, so l, I and 1 can't be mixed up. */
+  font-feature-settings: "cv05" 1, "cv08" 1;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.5;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Where fixed action bars sit: above the bottom tab bar on phones and
+   iPads, at the bottom edge on wide screens (no tab bar there). */
+:root {
+  --action-bar-bottom: calc(4.6rem + env(safe-area-inset-bottom));
+}
+@media (min-width: 64rem) {
+  :root {
+    --action-bar-bottom: 0px;
+  }
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* Thermal receipts. 58 mm paper prints about 48 mm wide, 80 mm paper about 72 mm.
+   Receipts keep a fixed size no matter the text size setting. */
+.receipt {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-feature-settings: normal;
+  color: #000;
+  background: #fff;
+  font-size: 11px;
+  line-height: 1.35;
+  width: 48mm;
+  margin: 0 auto;
+  padding: 3mm 0 6mm;
+}
+.receipt.w80 {
+  width: 72mm;
+  font-size: 12px;
+}
+.receipt h1 {
+  font-size: 1.3em;
+  font-weight: 700;
+  text-align: center;
+  margin: 0;
+}
+.receipt .center {
+  text-align: center;
+}
+.receipt .row {
+  display: flex;
+  justify-content: space-between;
+  gap: 2mm;
+}
+.receipt .row > :last-child {
+  text-align: right;
+  white-space: nowrap;
+}
+.receipt .bold {
+  font-weight: 700;
+}
+.receipt .big {
+  font-size: 1.25em;
+}
+.receipt .muted {
+  font-size: 0.9em;
+}
+.receipt .rule {
+  border-top: 1px dashed #000;
+  margin: 1.5mm 0;
+}
+.receipt .gap {
+  height: 2mm;
+}
+.receipt .sign {
+  margin-top: 8mm;
+  border-top: 1px solid #000;
+  padding-top: 1mm;
+  text-align: center;
+}
+.receipt .copy-break {
+  border-top: 1px dashed #000;
+  margin: 8mm 0 4mm;
+}
+.receipt table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.receipt td,
+.receipt th {
+  padding: 0;
+  text-align: right;
+  font-weight: normal;
+}
+.receipt td:first-child,
+.receipt th:first-child {
+  text-align: left;
+}
+.receipt td + td,
+.receipt th + th {
+  padding-left: 1.5mm;
+}
+
+/* Only the receipt in #print-root prints. */
+#print-root {
+  display: none;
+}
+@media print {
+  @page {
+    margin: 0;
+  }
+  html {
+    font-size: 100% !important;
+  }
+  html,
+  body {
+    background: #fff !important;
+  }
+  #root,
+  body > section,
+  body > div:not(#print-root) {
+    display: none !important;
+  }
+  #print-root {
+    display: block;
+  }
+}

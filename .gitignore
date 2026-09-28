@@ -1,0 +1,14 @@
+node_modules
+dist
+.DS_Store
+
+# env / secrets
+.env.local
+.env*.local
+
+# local Convex backend data (contains real accounts)
+.convex/
+
+# tooling
+.claude/
+.vercel

@@ -1,0 +1,13 @@
+// Bottle-cap (crown cork) mark, drawn as SVG so it stays sharp at every size.
+const CAP = "M32.00 5.00Q36.99 -1.13 39.96 6.20Q46.54 1.82 47.21 9.69Q54.79 7.44 53.11 15.17Q61.01 15.25 57.13 22.14Q64.66 24.55 58.92 29.98Q65.41 34.50 58.32 38.01Q63.18 44.24 55.38 45.50Q58.19 52.89 50.36 51.79Q50.87 59.68 43.71 56.33Q41.87 64.01 36.02 58.70Q32.00 65.50 27.98 58.70Q22.13 64.01 20.29 56.33Q13.13 59.68 13.64 51.79Q5.81 52.89 8.62 45.50Q0.82 44.24 5.68 38.01Q-1.41 34.50 5.08 29.98Q-0.66 24.55 6.87 22.14Q2.99 15.25 10.89 15.17Q9.21 7.44 16.79 9.69Q17.46 1.82 24.04 6.20Q27.01 -1.13 32.00 5.00Z";
+
+export function LogoMark({ className = "size-9" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 64 64" className={className} aria-hidden="true">
+      <path d={CAP} fill="#2563EB" />
+      <circle cx="32" cy="32" r="18.5" fill="#1D4ED8" />
+      <circle cx="32" cy="32" r="18.5" fill="none" stroke="#FFFFFF" strokeWidth="3" />
+      <path d="M24.5 27.5a9 9 0 0 1 8-6" fill="none" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" opacity="0.85" />
+    </svg>
+  );
+}
