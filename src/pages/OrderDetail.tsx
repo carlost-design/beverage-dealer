@@ -30,10 +30,12 @@ import {
 import { useErrorMessage, useFmt, useT } from "../i18n";
 import { cx } from "../lib/format";
 import { useToday } from "../lib/useToday";
+import { useTourPage } from "../tour/TourProvider";
 
 const STATUS_WORDS = { unpaid: "Hindi pa bayad", partial: "May balanse", paid: "Bayad na" } as const;
 
 export default function OrderDetail() {
+  useTourPage("order-detail");
   const t = useT();
   const fmt = useFmt();
   const errorMessage = useErrorMessage();
@@ -77,16 +79,16 @@ export default function OrderDetail() {
         back={{ to: "/orders", label: t.nav.orders }}
         actions={
           <>
-            <Button variant="secondary" size="lg" onClick={() => setPrinting(true)}>
+            <Button variant="secondary" size="lg" onClick={() => setPrinting(true)} data-tour="order-print">
               <Printer className="size-6" /> {t.flow.printReceipt}
             </Button>
             {canEditItems && (
-              <LinkButton to={`/orders/${order._id}/edit`} variant="secondary" size="lg">
+              <LinkButton to={`/orders/${order._id}/edit`} variant="secondary" size="lg" data-tour="order-edit">
                 <Pencil className="size-5" /> {t.order.change}
               </LinkButton>
             )}
             {!order.voided && balance > 0 && (
-              <Button variant="success" size="lg" onClick={() => setPaying(true)}>
+              <Button variant="success" size="lg" onClick={() => setPaying(true)} data-tour="order-pay">
                 <Wallet className="size-6" /> {t.home.receivePayment}
               </Button>
             )}
@@ -118,7 +120,7 @@ export default function OrderDetail() {
 
       <div className="grid gap-5 lg:grid-cols-3">
         <div className="space-y-5 lg:col-span-2">
-          <Card>
+          <Card data-tour="order-items">
             <CardHeader title={t.order.items} description={t.common.cases(cases)} />
             <ul className="divide-y divide-line px-5 sm:px-6">
               {order.items.map((item) => (
@@ -171,7 +173,7 @@ export default function OrderDetail() {
             )}
           </Card>
 
-          <Card>
+          <Card data-tour="order-payments">
             <CardHeader
               title={t.order.payments}
               action={
@@ -240,7 +242,7 @@ export default function OrderDetail() {
             )}
           </Card>
 
-          <Card className="space-y-5 p-5">
+          <Card className="space-y-5 p-5" data-tour="order-status">
             <div>
               <p className="mb-2 text-base font-semibold text-ink-3">{t.order.paymentStatus}</p>
               <PaymentBadge status={order.paymentStatus} isLate={isLate} daysLate={daysLate} voided={order.voided} />
@@ -296,7 +298,7 @@ export default function OrderDetail() {
           </Card>
 
           {!order.voided && (
-            <Button variant="ghost" className="w-full text-[#B42318] hover:bg-[#FEF3F2]" onClick={() => setCancelling(true)}>
+            <Button variant="ghost" className="w-full text-[#B42318] hover:bg-[#FEF3F2]" onClick={() => setCancelling(true)} data-tour="order-cancel">
               <Ban className="size-5" /> {t.order.cancelOrder}
             </Button>
           )}

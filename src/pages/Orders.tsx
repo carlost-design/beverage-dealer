@@ -10,10 +10,12 @@ import { Avatar, Button, Card, EmptyState, LinkButton, PageHeader, PageLoading, 
 import { useFmt, useT } from "../i18n";
 import { cx } from "../lib/format";
 import { useToday } from "../lib/useToday";
+import { useTourPage } from "../tour/TourProvider";
 
 type Tab = "today" | "unpaid" | "all";
 
 export default function Orders() {
+  useTourPage("orders");
   const t = useT();
   const today = useToday();
   const [params, setParams] = useSearchParams();
@@ -46,13 +48,13 @@ export default function Orders() {
       <PageHeader
         title={t.orders.title}
         actions={
-          <LinkButton to="/orders/new" size="lg">
+          <LinkButton to="/orders/new" size="lg" data-tour="orders-new">
             <Plus className="size-6" strokeWidth={2.5} /> {t.nav.newOrder}
           </LinkButton>
         }
       />
 
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center">
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center" data-tour="orders-filters">
         <Segmented
           label={t.orders.title}
           value={tab}
@@ -67,13 +69,13 @@ export default function Orders() {
       </div>
 
       {tab === "today" && (
-        <div className="mb-4">
+        <div className="mb-4" data-tour="orders-date">
           <DateNav date={date} today={today} onChange={setDate} />
         </div>
       )}
       {tab === "unpaid" && open && <UnpaidSummary rows={open} lateOnly={lateOnly} onLateOnly={setLateOnly} />}
 
-      <Card>
+      <Card data-tour="orders-list">
         {loading ? (
           <div className="p-6">
             <PageLoading />

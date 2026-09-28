@@ -7,6 +7,7 @@ import { ProductTile } from "../components/ProductTile";
 import { Avatar, Card, CardHeader, Chip, DeltaChip, EmptyState, IconTile, LinkButton, PageHeader, PageLoading, StatCard } from "../components/ui";
 import { useFmt, useT } from "../i18n";
 import { addDays, useToday } from "../lib/useToday";
+import { useTourPage } from "../tour/TourProvider";
 
 function change(current: number, previous: number) {
   if (previous === 0) return current === 0 ? 0 : null;
@@ -14,6 +15,7 @@ function change(current: number, previous: number) {
 }
 
 export default function Reports() {
+  useTourPage("reports");
   const t = useT();
   const fmt = useFmt();
   const today = useToday();
@@ -53,7 +55,7 @@ export default function Reports() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" data-tour="reports-kpis">
         <StatCard
           title={t.reports.salesKpi}
           icon={ReceiptText}
@@ -89,7 +91,7 @@ export default function Reports() {
       </div>
 
       <div className="mt-5 grid gap-5 xl:grid-cols-3">
-        <Card className="xl:col-span-2">
+        <Card className="xl:col-span-2" data-tour="reports-chart">
           <CardHeader title={t.reports.salesAndPayments} description={t.reports.last30} />
           <div className="px-5 pb-5 sm:px-6">
             <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -142,7 +144,7 @@ export default function Reports() {
       </div>
 
       <div className="mt-5 grid gap-5 xl:grid-cols-2">
-        <Card>
+        <Card data-tour="reports-best">
           <CardHeader title={t.reports.bestSellers} description={t.reports.last30Label} />
           {data.bestSellers.length === 0 ? (
             <EmptyState title={t.reports.noSales} />
@@ -176,7 +178,7 @@ export default function Reports() {
             </div>
           )}
         </Card>
-        <Card>
+        <Card data-tour="reports-clients">
           <CardHeader title={t.reports.topClients} description={t.reports.last30Label} />
           {data.topClients.length === 0 ? (
             <EmptyState title={t.reports.noSales} />

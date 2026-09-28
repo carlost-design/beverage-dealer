@@ -30,8 +30,10 @@ import {
 import { useErrorMessage, useFmt, useT } from "../i18n";
 import { cx } from "../lib/format";
 import { useToday } from "../lib/useToday";
+import { useTourPage } from "../tour/TourProvider";
 
 export default function ClientDetail() {
+  useTourPage("client-detail");
   const t = useT();
   const fmt = useFmt();
   const errorMessage = useErrorMessage();
@@ -74,7 +76,7 @@ export default function ClientDetail() {
           </h1>
           {client.storeName && <p className="mt-1 text-lg text-ink-3">{client.storeName}</p>}
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-3" data-tour="client-actions">
           {client.active && (
             <LinkButton to={`/orders/new?client=${client._id}`} size="lg">
               <Plus className="size-6" /> {t.clients.newOrder}
@@ -104,7 +106,7 @@ export default function ClientDetail() {
         )}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-3" data-tour="client-stats">
         <StatCard title={t.clients.utang} icon={HandCoins} tone="orange" value={fmt.moneyWhole(data.balance)} caption={t.clients.unpaidOrders(data.openOrders.length)} />
         <StatCard
           title={t.clients.overdue}
@@ -119,7 +121,7 @@ export default function ClientDetail() {
 
       <div className="mt-5 grid gap-5 lg:grid-cols-3">
         <div className="space-y-5 lg:col-span-2">
-          <Card>
+          <Card data-tour="client-unpaid">
             <CardHeader title={t.clients.unpaidTitle} description={t.clients.unpaidHint} />
             {data.openOrders.length === 0 ? (
               <p className="px-6 pb-6 text-lg font-semibold text-[#146C43]">{t.clients.allPaid}</p>
@@ -200,7 +202,7 @@ export default function ClientDetail() {
         </div>
 
         <div className="space-y-5">
-          <Card className="p-5">
+          <Card className="p-5" data-tour="client-details">
             <div className="mb-4 flex items-center justify-between gap-3">
               <p className="text-lg font-semibold text-ink">{t.clients.details}</p>
               <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
@@ -241,7 +243,7 @@ export default function ClientDetail() {
             </dl>
           </Card>
 
-          <Card>
+          <Card data-tour="client-empties">
             <CardHeader
               title={t.clients.emptiesTitle}
               description={t.clients.emptiesHint}
@@ -274,7 +276,7 @@ export default function ClientDetail() {
             )}
           </Card>
 
-          <Button variant="ghost" className="w-full" onClick={toggleArchive}>
+          <Button variant="ghost" className="w-full" onClick={toggleArchive} data-tour="client-archive">
             {client.active ? (
               <>
                 <Archive className="size-5" /> {t.clients.archive}

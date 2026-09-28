@@ -4,7 +4,9 @@ import {
   AlertTriangle,
   BarChart3,
   Bell,
+  BookOpen,
   Boxes,
+  CircleHelp,
   ClipboardCheck,
   Home,
   LogOut,
@@ -23,6 +25,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { api } from "../../convex/_generated/api";
 import { useFmt, useLang, useSetLanguage, useT, type Lang } from "../i18n";
+import { useTour } from "../tour/TourProvider";
 import { cx } from "../lib/format";
 import { useTextSize, type TextSize } from "../lib/textSize";
 import { useToday } from "../lib/useToday";
@@ -82,7 +85,7 @@ export default function AppShell() {
           <LogoMark className="size-11 shrink-0" />
           <span className="line-clamp-2 text-lg leading-tight font-bold text-ink">{businessName}</span>
         </Link>
-        <nav className="space-y-1 px-4" aria-label={t.nav.menu}>
+        <nav className="space-y-1 px-4" aria-label={t.nav.menu} data-tour="nav-sidebar">
           {nav.map((item) => (
             <SideLink key={item.to} {...item} />
           ))}
@@ -90,6 +93,7 @@ export default function AppShell() {
         <div className="mx-6 my-4 border-t border-line" />
         <nav className="px-4">
           <SideLink to="/settings" label={t.nav.settings} icon={Settings} />
+          <SideLink to="/help" label={t.nav.help} icon={BookOpen} />
         </nav>
         <div className="mt-auto p-4">
           <DayCard alerts={alerts} />
@@ -106,24 +110,26 @@ export default function AppShell() {
             <LogoMark className="size-10 shrink-0" />
             <span className="truncate text-lg font-bold text-ink">{businessName}</span>
           </Link>
-          <div className="hidden w-full max-w-md lg:block">
+          <div className="hidden w-full max-w-md lg:block" data-tour="search">
             <GlobalSearch />
           </div>
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
+              data-tour="search-button"
               onClick={() => setSearchOpen((v) => !v)}
               aria-label={t.common.search}
               className="flex size-12 items-center justify-center rounded-full border border-line bg-white text-ink-2 hover:bg-gray-50 lg:hidden"
             >
               {searchOpen ? <X className="size-6" /> : <Search className="size-6" />}
             </button>
-            <div className="hidden sm:block">
+            <div className="hidden sm:block" data-tour="language">
               <LanguageToggle />
             </div>
-            <div className="hidden sm:block">
+            <div className="hidden sm:block" data-tour="text-size">
               <TextSizeMenu />
             </div>
+            <TourButton />
             <AlertsMenu alerts={alerts} />
             <AccountMenu />
           </div>
@@ -148,10 +154,10 @@ export default function AppShell() {
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         aria-label={t.nav.menu}
       >
-        <div className="grid grid-cols-5 items-end">
+        <div className="grid grid-cols-5 items-end" data-tour="nav-bottom">
           <TabLink to="/" label={t.nav.home} icon={Home} end />
           <TabLink to="/orders" label={t.nav.orders} icon={ReceiptText} />
-          <Link to="/orders/new" className="flex flex-col items-center gap-1 pb-2" aria-label={t.nav.newOrder}>
+          <Link to="/orders/new" className="flex flex-col items-center gap-1 pb-2" aria-label={t.nav.newOrder} data-tour="nav-new">
             <span className="-mt-6 flex size-16 items-center justify-center rounded-full bg-brand text-white shadow-pop ring-4 ring-white">
               <Plus className="size-8" strokeWidth={2.5} />
             </span>
@@ -265,6 +271,25 @@ function DayCard({ alerts }: { alerts: Alerts | undefined }) {
         {t.home.countAndClose}
       </Link>
     </div>
+  );
+}
+
+// Starts the walkthrough for whatever screen is open.
+function TourButton() {
+  const t = useT();
+  const { pageTour, start } = useTour();
+  if (!pageTour) return null;
+  return (
+    <button
+      type="button"
+      data-tour="tour-button"
+      onClick={() => start(pageTour)}
+      aria-label={t.nav.tour}
+      className="flex h-12 shrink-0 items-center gap-2 rounded-full bg-brand-soft px-3 text-base font-semibold text-brand-strong ring-1 ring-[#C7D7FE] hover:bg-[#DFE8FF] xl:pr-5"
+    >
+      <CircleHelp className="size-6" strokeWidth={2.25} aria-hidden />
+      <span className="hidden xl:inline">{t.nav.tour}</span>
+    </button>
   );
 }
 
@@ -399,7 +424,7 @@ function AlertsMenu({ alerts }: { alerts: Alerts | undefined }) {
   const count = alerts ? alerts.lateCount + alerts.low.length + (alerts.previousOpen ? 1 : 0) : 0;
   return (
     <div className="relative" ref={ref}>
-      <button type="button" className={roundButton} onClick={() => setOpen((v) => !v)} aria-label={`${t.home.latePayers}, ${t.home.runningLow}`} aria-expanded={open}>
+      <button type="button" className={roundButton} onClick={() => setOpen((v) => !v)} aria-label={`${t.home.latePayers}, ${t.home.runningLow}`} aria-expanded={open} data-tour="alerts">
         <Bell className="size-6" />
         {count > 0 && (
           <span className="absolute -top-1 -right-1 min-w-6 rounded-full bg-red-600 px-1.5 text-center text-xs leading-6 font-bold text-white">
@@ -491,10 +516,11 @@ function AccountMenu() {
     { to: "/reports", label: t.nav.reports, icon: BarChart3, mobileOnly: true },
     { to: "/products", label: t.nav.products, icon: Package, mobileOnly: true },
     { to: "/settings", label: t.nav.settings, icon: Settings, mobileOnly: false },
+    { to: "/help", label: t.nav.help, icon: BookOpen, mobileOnly: false },
   ];
   return (
     <div className="relative" ref={ref}>
-      <button type="button" onClick={() => setOpen((v) => !v)} aria-label={t.nav.menu} aria-expanded={open} className="rounded-full">
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-label={t.nav.menu} aria-expanded={open} className="rounded-full" data-tour="account">
         <Avatar name={email || "?"} />
       </button>
       {open && (

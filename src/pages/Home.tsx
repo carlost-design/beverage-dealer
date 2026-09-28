@@ -2,6 +2,8 @@ import { useQuery } from "convex/react";
 import {
   AlertTriangle,
   ArrowRight,
+  BookOpen,
+  CircleHelp,
   CheckCircle2,
   ClipboardCheck,
   HandCoins,
@@ -13,6 +15,7 @@ import {
   Wallet,
   type LucideIcon,
 } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router";
 import { api } from "../../convex/_generated/api";
 import { ProductTile } from "../components/ProductTile";
@@ -33,8 +36,10 @@ import {
 import { useFmt, useT } from "../i18n";
 import { cx, manilaHour } from "../lib/format";
 import { useToday } from "../lib/useToday";
+import { markWelcomeDone, readWelcomeDone, useTour, useTourPage } from "../tour/TourProvider";
 
 export default function Home() {
+  useTourPage("home");
   const t = useT();
   const fmt = useFmt();
   const today = useToday();
@@ -64,6 +69,7 @@ export default function Home() {
       </div>
 
       <div className="space-y-3">
+        <WelcomeTour />
         {needsSetup && <SetupCard hasName={settings.hasBusinessName} products={data.setup.products} clients={data.setup.clients} />}
         {data.stock.previousOpen && (
           <Alert
@@ -86,15 +92,15 @@ export default function Home() {
         )}
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <TaskButton to="/orders/new" icon={ShoppingCart} label={t.home.newOrder} primary />
-        <TaskButton to="/payments/new" icon={Wallet} label={t.home.receivePayment} tone="green" />
-        <TaskButton to="/inventory/delivery" icon={Truck} label={t.home.deliveryArrived} tone="orange" />
-        <TaskButton to={closeLink} icon={ClipboardCheck} label={t.home.closeDay} tone="violet" />
+      <div className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-4" data-tour="home-tasks">
+        <TaskButton tour="home-new-order" to="/orders/new" icon={ShoppingCart} label={t.home.newOrder} primary />
+        <TaskButton tour="home-pay" to="/payments/new" icon={Wallet} label={t.home.receivePayment} tone="green" />
+        <TaskButton tour="home-delivery" to="/inventory/delivery" icon={Truck} label={t.home.deliveryArrived} tone="orange" />
+        <TaskButton tour="home-close" to={closeLink} icon={ClipboardCheck} label={t.home.closeDay} tone="violet" />
       </div>
 
       <h2 className="mt-9 mb-4 text-2xl font-bold tracking-tight text-ink">{t.home.today}</h2>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" data-tour="home-today">
         <StatCard
           title={t.home.sales}
           icon={ReceiptText}
@@ -140,7 +146,7 @@ export default function Home() {
       </div>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-5">
-        <Card className="lg:col-span-3">
+        <Card className="lg:col-span-3" data-tour="home-late">
           <CardHeader
             title={t.home.latePayers}
             description={t.home.latePayersHint}
@@ -183,7 +189,7 @@ export default function Home() {
           )}
         </Card>
 
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-2" data-tour="home-stock">
           <CardHeader
             title={t.reports.stockToday}
             description={`${t.stock.startShort} ${data.stock.starting} · ${t.stock.nowShort} ${data.stock.now} ${t.stock.casesUnit}`}
@@ -217,12 +223,14 @@ export default function Home() {
 }
 
 function TaskButton({
+  tour,
   to,
   icon,
   label,
   primary = false,
   tone = "blue",
 }: {
+  tour: string;
   to: string;
   icon: LucideIcon;
   label: string;
@@ -233,6 +241,7 @@ function TaskButton({
   return (
     <Link
       to={to}
+      data-tour={tour}
       className={cx(
         "group flex min-h-36 flex-col justify-between gap-4 rounded-2xl p-5 shadow-card transition-shadow hover:shadow-pop",
         primary ? "bg-brand text-white" : "border border-line bg-white text-ink",
@@ -250,6 +259,47 @@ function TaskButton({
         <ArrowRight className={cx("size-6 shrink-0 transition-transform group-hover:translate-x-1", primary ? "text-white" : "text-ink-3")} />
       </span>
     </Link>
+  );
+}
+
+// Offers the walkthrough once per device, until it is taken or turned down.
+function WelcomeTour() {
+  const t = useT();
+  const { start } = useTour();
+  const [show, setShow] = useState(() => !readWelcomeDone());
+  if (!show) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-4 rounded-2xl bg-gradient-to-br from-[#1D4ED8] to-[#2563EB] p-5 text-white shadow-pop sm:p-6">
+      <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-white/15">
+        <CircleHelp className="size-8" aria-hidden />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-xl font-bold">{t.home.tourTitle}</p>
+        <p className="mt-1 text-base text-blue-50">{t.home.tourHint}</p>
+      </div>
+      <div className="flex w-full flex-wrap gap-3 sm:w-auto">
+        <button
+          type="button"
+          onClick={() => {
+            setShow(false);
+            start("home");
+          }}
+          className="flex h-12 flex-1 items-center justify-center rounded-full bg-white px-5 text-base font-bold text-brand-strong hover:bg-blue-50 sm:flex-none"
+        >
+          {t.home.tourStart}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            markWelcomeDone();
+            setShow(false);
+          }}
+          className="flex h-12 items-center justify-center rounded-full px-4 text-base font-semibold text-white ring-1 ring-white/40 hover:bg-white/10"
+        >
+          {t.home.tourLater}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -280,6 +330,9 @@ function SetupCard({ hasName, products, clients }: { hasName: boolean; products:
           </li>
         ))}
       </ol>
+      <Link to="/help" className="mt-3 inline-flex items-center gap-2 rounded-xl px-1 py-2 text-base font-semibold text-ink-3 hover:text-ink">
+        <BookOpen className="size-5" /> {t.home.guideLink}
+      </Link>
     </Card>
   );
 }

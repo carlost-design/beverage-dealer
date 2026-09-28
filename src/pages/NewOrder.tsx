@@ -50,6 +50,7 @@ import {
 import { useErrorMessage, useFmt, useT } from "../i18n";
 import { cx, parsePeso, pesoInput } from "../lib/format";
 import { addDays, useToday } from "../lib/useToday";
+import { useTourPage } from "../tour/TourProvider";
 
 type ClientRow = NonNullable<ReturnType<typeof useClientList>>[number];
 type ExistingOrder = NonNullable<ReturnType<typeof useOrder>>;
@@ -297,6 +298,8 @@ function OrderFlow({
     }
   }
 
+  useTourPage(savedId ? null : `new-order-${step}`);
+
   if (savedId) return <Saved orderId={savedId} today={today} onRestart={onRestart} />;
 
   const term = search.trim().toLowerCase();
@@ -351,12 +354,13 @@ function OrderFlow({
 
       {step === "client" && (
         <div className="space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="flex flex-col gap-3 sm:flex-row" data-tour="flow-client-search">
             <SearchField value={search} onChange={setSearch} placeholder={t.flow.typeName} className="flex-1" />
             <Button variant="secondary" onClick={() => setAddingClient(true)}>
               <UserPlus className="size-5" /> {t.flow.newClient}
             </Button>
           </div>
+          <div data-tour="flow-client-list">
           <ClientChoices
             clients={clients.filter(
               (c) => c.active && (!term || `${c.name} ${c.storeName ?? ""}`.toLowerCase().includes(term)),
@@ -365,11 +369,12 @@ function OrderFlow({
             onSelect={chooseClient}
             emptyText={term ? t.flow.noClientMatch(search.trim()) : t.clients.emptyFirst}
           />
+          </div>
         </div>
       )}
 
       {step === "cases" && (
-        <div className="space-y-4">
+        <div className="space-y-4" data-tour="flow-products">
           {products.length > 8 && <SearchField value={search} onChange={setSearch} placeholder={t.flow.findProduct} />}
           {products.length === 0 ? (
             <Card>
@@ -403,7 +408,7 @@ function OrderFlow({
 
       {step === "details" && (
         <div className="space-y-5">
-          <Card className="p-5 sm:p-6">
+          <Card className="p-5 sm:p-6" data-tour="flow-fulfillment">
             <h2 className="mb-4 text-xl font-bold text-ink">{t.flow.howGetIt}</h2>
             <ChoiceCards
               label={t.flow.howGetIt}
@@ -429,7 +434,7 @@ function OrderFlow({
           </Card>
 
           {!editing && (
-            <Card className="p-5 sm:p-6">
+            <Card className="p-5 sm:p-6" data-tour="flow-payment">
               <h2 className="mb-4 text-xl font-bold text-ink">{t.flow.howPaying}</h2>
               <ChoiceCards
                 label={t.flow.howPaying}
@@ -469,7 +474,7 @@ function OrderFlow({
             </Card>
           )}
 
-          <Card className="p-5 sm:p-6">
+          <Card className="p-5 sm:p-6" data-tour="flow-discount">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <span className="flex size-11 items-center justify-center rounded-xl bg-[#E8F7EE] text-[#16A34A]">
@@ -500,7 +505,7 @@ function OrderFlow({
             )}
           </Card>
 
-          <Card className="p-5 sm:p-6">
+          <Card className="p-5 sm:p-6" data-tour="flow-note">
             {noteOpen ? (
               <Field label={t.flow.note} hint={t.common.optional}>
                 <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} autoFocus />
@@ -515,7 +520,7 @@ function OrderFlow({
       )}
 
       {step === "review" && client && (
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden" data-tour="flow-review">
           <div className="px-5 pt-5 sm:px-6">
             <p className="text-base font-semibold text-ink-3">{t.flow.items}</p>
           </div>
@@ -592,6 +597,7 @@ function OrderFlow({
 
       {/* Back / next, always in the same place */}
       <div
+        data-tour="flow-bar"
         className="fixed inset-x-0 z-20 border-t border-line bg-white/95 backdrop-blur lg:left-72"
         style={{ bottom: "var(--action-bar-bottom)", paddingBottom: "env(safe-area-inset-bottom)" }}
       >
@@ -614,11 +620,11 @@ function OrderFlow({
             )}
           </div>
           {step === "review" ? (
-            <Button size="lg" variant="success" onClick={save} loading={saving} disabled={dayClosed}>
+            <Button size="lg" variant="success" onClick={save} loading={saving} disabled={dayClosed} data-tour="flow-save">
               <CheckCircle2 className="size-6" /> {editing ? t.common.saveChanges : t.flow.saveOrder}
             </Button>
           ) : step === "client" ? null : (
-            <Button size="lg" onClick={next}>
+            <Button size="lg" onClick={next} data-tour="flow-next">
               {t.common.next} <ArrowRight className="size-6" />
             </Button>
           )}
@@ -707,7 +713,7 @@ function ProductLine({
   const out = available <= 0;
   const low = !out && product.lowStockLevel > 0 && available <= product.lowStockLevel;
   return (
-    <li className={cx("px-5 py-4 sm:px-6", quantity > 0 && "bg-brand-soft/60")}>
+    <li className={cx("px-5 py-4 sm:px-6", quantity > 0 && "bg-brand-soft/60")} data-tour="flow-product">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <ProductTile category={product.category} />
         <div className="min-w-0 flex-1">

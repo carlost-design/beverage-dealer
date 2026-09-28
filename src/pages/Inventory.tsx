@@ -41,8 +41,10 @@ import {
 import { useErrorMessage, useFmt, useT } from "../i18n";
 import { cx } from "../lib/format";
 import { useToday } from "../lib/useToday";
+import { useTourPage } from "../tour/TourProvider";
 
 export default function Inventory() {
+  useTourPage("stock");
   const t = useT();
   const fmt = useFmt();
   const errorMessage = useErrorMessage();
@@ -109,19 +111,19 @@ export default function Inventory() {
           <>
             {editable && (
               <>
-                <LinkButton to="/inventory/delivery" variant="secondary" size="lg">
+                <LinkButton to="/inventory/delivery" variant="secondary" size="lg" data-tour="stock-delivery">
                   <Truck className="size-6" /> {t.stock.deliveryArrived}
                 </LinkButton>
-                <Button variant="secondary" size="lg" onClick={() => setModal("damage")}>
+                <Button variant="secondary" size="lg" onClick={() => setModal("damage")} data-tour="stock-damaged">
                   <PackageMinus className="size-6" /> {t.stock.damaged}
                 </Button>
-                <LinkButton to={`/inventory/close?date=${date}`} size="lg">
+                <LinkButton to={`/inventory/close?date=${date}`} size="lg" data-tour="stock-close">
                   <ClipboardCheck className="size-6" /> {t.stock.countClose}
                 </LinkButton>
               </>
             )}
             {closed && day.isLatest && (
-              <Button variant="secondary" size="lg" onClick={() => setModal("reopen")}>
+              <Button variant="secondary" size="lg" onClick={() => setModal("reopen")} data-tour="stock-reopen">
                 <RotateCcw className="size-6" /> {t.stock.reopen}
               </Button>
             )}
@@ -132,7 +134,7 @@ export default function Inventory() {
         }
       />
 
-      <div className="mb-5">
+      <div className="mb-5" data-tour="stock-date">
         <DateNav date={date} today={today} onChange={setDate} />
       </div>
 
@@ -163,7 +165,7 @@ export default function Inventory() {
         )}
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <div className="mt-5 grid grid-cols-2 gap-4 xl:grid-cols-4" data-tour="stock-totals">
         <StatCard title={t.stock.start} icon={Boxes} tone="gray" value={totals.starting} caption={t.stock.casesUnit} />
         <StatCard title={t.stock.received} icon={PackagePlus} tone="green" value={`+${totals.stockIn}`} caption={t.stock.casesUnit} />
         <StatCard
@@ -176,7 +178,7 @@ export default function Inventory() {
         <StatCard title={closed ? t.stock.end : t.stock.now} icon={Boxes} tone="violet" value={totals.end} caption={t.stock.casesUnit} />
       </div>
 
-      <Card className="mt-5">
+      <Card className="mt-5" data-tour="stock-table">
         <CardHeader
           title={closed ? t.stock.end : t.stock.now}
           action={
@@ -261,7 +263,7 @@ export default function Inventory() {
       </Card>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
-        <Card>
+        <Card data-tour="stock-empties">
           <CardHeader
             title={t.stock.emptiesTitle}
             description={t.stock.emptiesHint}
