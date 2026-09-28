@@ -4,6 +4,7 @@ import {
   useId,
   type ButtonHTMLAttributes,
   type ComponentType,
+  type HTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
   type SelectHTMLAttributes,
@@ -176,8 +177,12 @@ export function Field({
 
 /* ---------- Surfaces ---------- */
 
-export function Card({ className, children }: { className?: string; children: ReactNode }) {
-  return <div className={cx("rounded-2xl border border-line bg-white shadow-card", className)}>{children}</div>;
+export function Card({ className, children, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={cx("rounded-2xl border border-line bg-white shadow-card", className)} {...props}>
+      {children}
+    </div>
+  );
 }
 
 export function CardHeader({
@@ -643,7 +648,7 @@ export function Stepper({
 export function StepHeader({ step, of, title }: { step: number; of: number; title: string }) {
   const t = useT();
   return (
-    <div className="mb-6">
+    <div className="mb-6" data-tour="flow-steps">
       <div className="flex items-center justify-between gap-3">
         <p className="text-base font-semibold text-brand-strong">{t.common.stepOf(step, of)}</p>
       </div>

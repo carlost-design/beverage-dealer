@@ -22,6 +22,7 @@ import {
 import { useErrorMessage, useFmt, useT } from "../i18n";
 import { parsePeso, pesoInput } from "../lib/format";
 import { useToday } from "../lib/useToday";
+import { useTourPage } from "../tour/TourProvider";
 
 type Line = { quantity: number; cost: string; costOpen: boolean; empties: number };
 
@@ -38,6 +39,7 @@ export default function DeliveryArrived() {
   const [lines, setLines] = useState<Record<string, Line>>({});
   const [saving, setSaving] = useState(false);
   const [savedCases, setSavedCases] = useState<number | null>(null);
+  useTourPage(savedCases === null ? "delivery" : null);
 
   if (!products || !day) return <PageLoading />;
   const active = products.filter((p) => p.active);
@@ -102,7 +104,7 @@ export default function DeliveryArrived() {
         </div>
       )}
 
-      <Card className="mb-5 grid gap-4 p-5 sm:grid-cols-2 sm:p-6">
+      <Card className="mb-5 grid gap-4 p-5 sm:grid-cols-2 sm:p-6" data-tour="delivery-supplier">
         <Field label={t.delivery.supplier} hint={t.common.optional}>
           <Input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder={t.delivery.supplierPlaceholder} />
         </Field>
@@ -111,7 +113,7 @@ export default function DeliveryArrived() {
         </Field>
       </Card>
 
-      <Card className="mb-5">
+      <Card className="mb-5" data-tour="delivery-cases">
         <CardHeader title={t.delivery.casesReceived} />
         {active.length === 0 ? (
           <EmptyState title={t.stock.noProducts} action={<LinkButton to="/products">{t.stock.addProducts}</LinkButton>} />
@@ -158,7 +160,7 @@ export default function DeliveryArrived() {
       </Card>
 
       {returnable.length > 0 && (
-        <Card>
+        <Card data-tour="delivery-empties">
           <CardHeader title={t.delivery.emptiesGiven} description={t.stock.emptiesHint} />
           <ul className="divide-y divide-line">
             {returnable.map((p) => (
@@ -187,7 +189,7 @@ export default function DeliveryArrived() {
             <ArrowLeft className="size-6" /> <span className="hidden sm:inline">{t.common.back}</span>
           </LinkButton>
           <p className="min-w-0 flex-1 text-right text-lg font-bold tabular">{totalCases > 0 ? t.delivery.summary(totalCases, fmt.money(totalCost)) : ""}</p>
-          <Button size="lg" onClick={save} loading={saving} disabled={day.status === "closed"}>
+          <Button size="lg" onClick={save} loading={saving} disabled={day.status === "closed"} data-tour="delivery-save">
             <Truck className="size-6" /> {t.delivery.save}
           </Button>
         </div>

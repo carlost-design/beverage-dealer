@@ -9,8 +9,10 @@ import { TestSlip } from "../components/receipts";
 import { Button, Card, CardHeader, ChoiceCards, Field, IconTile, Input, PageHeader, PageLoading, Segmented, Textarea } from "../components/ui";
 import { useErrorMessage, useFmt, useLang, useSetLanguage, useT, type Lang } from "../i18n";
 import { useTextSize, type TextSize } from "../lib/textSize";
+import { useTourPage } from "../tour/TourProvider";
 
 export default function Settings() {
+  useTourPage("settings");
   const t = useT();
   const settings = useQuery(api.settings.get);
   if (!settings) return <PageLoading />;
@@ -37,7 +39,7 @@ function LanguageCard() {
   const lang = useLang();
   const setLanguage = useSetLanguage();
   return (
-    <Card className="p-5 sm:p-6">
+    <Card className="p-5 sm:p-6" data-tour="settings-language">
       <div className="mb-4 flex items-center gap-3">
         <IconTile icon={Languages} tone="blue" />
         <div>
@@ -62,7 +64,7 @@ function TextSizeCard() {
   const t = useT();
   const [size, setSize] = useTextSize();
   return (
-    <Card className="p-5 sm:p-6">
+    <Card className="p-5 sm:p-6" data-tour="settings-textsize">
       <div className="mb-4 flex items-center gap-3">
         <IconTile icon={Type} tone="violet" />
         <div>
@@ -133,7 +135,7 @@ function BusinessForm({ settings }: { settings: SettingsData }) {
   }
 
   return (
-    <Card>
+    <Card data-tour="settings-business">
       <CardHeader title={t.settings.business} description={t.settings.businessHint} />
       <form onSubmit={handleSubmit} className="space-y-5 px-5 pb-6 sm:px-6">
         <Field label={t.settings.businessName}>
@@ -206,7 +208,7 @@ function ActivityLog() {
   const fmt = useFmt();
   const { results, status, loadMore } = usePaginatedQuery(api.users.activityLog, {}, { initialNumItems: 15 });
   return (
-    <Card>
+    <Card data-tour="settings-activity">
       <CardHeader title={t.settings.activity} description={t.settings.activityHint} />
       {status === "LoadingFirstPage" ? (
         <p className="px-6 pb-6 text-base text-ink-3">…</p>

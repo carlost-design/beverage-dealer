@@ -10,6 +10,7 @@ import { Alert, Button, Card, CardHeader, EmptyState, LinkButton, Modal, PageHea
 import { useErrorMessage, useFmt, useT } from "../i18n";
 import { cx } from "../lib/format";
 import { useToday } from "../lib/useToday";
+import { useTourPage } from "../tour/TourProvider";
 
 export default function CloseDay() {
   const t = useT();
@@ -34,6 +35,7 @@ export default function CloseDay() {
 }
 
 function CloseDayForm({ date, rows, previousOpen }: { date: string; rows: StockRow[]; previousOpen: string | null }) {
+  useTourPage("close-day");
   const t = useT();
   const fmt = useFmt();
   const errorMessage = useErrorMessage();
@@ -76,7 +78,7 @@ function CloseDayForm({ date, rows, previousOpen }: { date: string; rows: StockR
       )}
       <Alert tone="blue" icon={ClipboardCheck} title={t.closeDay.instructions} />
 
-      <Card className="mt-5">
+      <Card className="mt-5" data-tour="close-list">
         <CardHeader title={t.closeDay.listTitle} description={t.closeDay.listHint} />
         <ul className="divide-y divide-line">
           {rows.map((row) => {
@@ -108,7 +110,7 @@ function CloseDayForm({ date, rows, previousOpen }: { date: string; rows: StockR
           <p className={cx("min-w-0 flex-1 text-base font-semibold", variances.length === 0 ? "text-[#146C43]" : "text-ink-2")}>
             {variances.length === 0 ? t.closeDay.allMatch : t.closeDay.shortOver(short, over)}
           </p>
-          <Button size="lg" onClick={() => setConfirming(true)}>
+          <Button size="lg" onClick={() => setConfirming(true)} data-tour="close-button">
             <ClipboardCheck className="size-6" /> {t.closeDay.close(fmt.shortDate(date))}
           </Button>
         </div>

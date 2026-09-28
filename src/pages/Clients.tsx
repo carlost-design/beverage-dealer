@@ -9,10 +9,12 @@ import { Avatar, Button, Card, Chip, EmptyState, PageHeader, PageLoading, Search
 import { useFmt, useT } from "../i18n";
 import { cx } from "../lib/format";
 import { useToday } from "../lib/useToday";
+import { useTourPage } from "../tour/TourProvider";
 
 type Filter = "all" | "utang" | "late" | "empties" | "archived";
 
 export default function Clients() {
+  useTourPage("clients");
   const t = useT();
   const fmt = useFmt();
   const today = useToday();
@@ -45,13 +47,13 @@ export default function Clients() {
         title={t.clients.title}
         description={t.clients.summary(active.length, fmt.money(active.reduce((s, c) => s + c.balance, 0)))}
         actions={
-          <Button size="lg" onClick={() => setAdding(true)}>
+          <Button size="lg" onClick={() => setAdding(true)} data-tour="clients-add">
             <UserPlus className="size-6" /> {t.clients.add}
           </Button>
         }
       />
 
-      <div className="mb-4 flex flex-col gap-3">
+      <div className="mb-4 flex flex-col gap-3" data-tour="clients-filters">
         <Segmented
           label={t.clients.title}
           value={filter}
@@ -67,7 +69,7 @@ export default function Clients() {
         <SearchField value={search} onChange={setSearch} placeholder={t.clients.searchPlaceholder} className="lg:max-w-md" />
       </div>
 
-      <Card>
+      <Card data-tour="clients-list">
         {rows.length === 0 ? (
           <EmptyState
             icon={Users}

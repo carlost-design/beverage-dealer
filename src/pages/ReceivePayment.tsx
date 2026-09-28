@@ -27,6 +27,7 @@ import {
 import { useErrorMessage, useFmt, useT } from "../i18n";
 import { cx, parsePeso, pesoInput } from "../lib/format";
 import { useToday } from "../lib/useToday";
+import { useTourPage } from "../tour/TourProvider";
 
 type Method = "cash" | "gcash" | "maya" | "bank" | "check";
 
@@ -39,6 +40,7 @@ export default function ReceivePayment() {
   const [search, setSearch] = useState("");
   const [done, setDone] = useState<{ amount: number; clientId: Id<"clients"> } | null>(null);
   const clientId = params.get("client");
+  useTourPage(done ? null : clientId ? "pay-amount" : "pay-client");
 
   if (!clients) return <PageLoading />;
   if (done) return <Done amount={done.amount} clientId={done.clientId} today={today} onAnother={() => { setDone(null); setParams({}); }} />;
@@ -66,13 +68,15 @@ export default function ReceivePayment() {
       <p className="mb-4 text-lg font-semibold text-ink-3">{t.pay.title}</p>
       <StepHeader step={1} of={2} title={t.pay.whoIsPaying} />
       <p className="-mt-3 mb-5 text-base text-ink-3">{t.pay.onlyWithUtang}</p>
-      <SearchField value={search} onChange={setSearch} placeholder={t.flow.typeName} className="mb-4" />
+      <div className="mb-4" data-tour="pay-search">
+        <SearchField value={search} onChange={setSearch} placeholder={t.flow.typeName} />
+      </div>
       {owing.length === 0 ? (
         <Card>
           <EmptyState icon={CheckCircle2} title={term ? t.clients.noMatch : t.pay.noUtang} />
         </Card>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <ul className="grid gap-3 sm:grid-cols-2" data-tour="pay-list">
           {owing.map((c) => {
             const late = c.daysLate > 0;
             return (
@@ -178,7 +182,7 @@ function PaymentForm({
         </div>
       )}
 
-      <Card className="space-y-5 p-5 sm:p-6">
+      <Card className="space-y-5 p-5 sm:p-6" data-tour="pay-amount">
         <Field label={t.flow.amountReceived}>
           <div className="flex flex-col gap-3 sm:flex-row">
             <PesoInput value={amount} onChange={setAmount} placeholder={pesoInput(total)} className="flex-1" autoFocus />
@@ -220,13 +224,13 @@ function PaymentForm({
         {value > total && <Alert tone="red" title={t.pay.tooMuch(fmt.money(total))} />}
       </Card>
 
-      <div className="fixed inset-x-0 z-20 border-t border-line bg-white/95 backdrop-blur lg:left-72" style={{ bottom: "var(--action-bar-bottom)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+      <div data-tour="flow-bar" className="fixed inset-x-0 z-20 border-t border-line bg-white/95 backdrop-blur lg:left-72" style={{ bottom: "var(--action-bar-bottom)", paddingBottom: "env(safe-area-inset-bottom)" }}>
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3 sm:px-6">
           <Button variant="secondary" size="lg" onClick={onChangeClient}>
             <ArrowLeft className="size-6" /> <span className="hidden sm:inline">{t.common.back}</span>
           </Button>
           <p className="min-w-0 flex-1 text-right text-xl font-bold tabular">{value > 0 ? fmt.money(value) : ""}</p>
-          <Button size="lg" variant="success" onClick={save} loading={saving} disabled={value <= 0 || value > total}>
+          <Button size="lg" variant="success" onClick={save} loading={saving} disabled={value <= 0 || value > total} data-tour="pay-save">
             <Wallet className="size-6" /> {t.pay.savePayment}
           </Button>
         </div>

@@ -9,10 +9,12 @@ import { Button, Card, Chip, EmptyState, Field, Input, Modal, PageHeader, PageLo
 import { useErrorMessage, useFmt, useT } from "../i18n";
 import { cx, parsePeso, pesoInput } from "../lib/format";
 import { useToday } from "../lib/useToday";
+import { useTourPage } from "../tour/TourProvider";
 
 type Category = "softdrinks" | "beer" | "other";
 
 export default function Products() {
+  useTourPage("products");
   const t = useT();
   const fmt = useFmt();
   const errorMessage = useErrorMessage();
@@ -43,7 +45,7 @@ export default function Products() {
         title={t.products.title}
         description={t.products.hint}
         actions={
-          <Button size="lg" onClick={() => setEditing("new")}>
+          <Button size="lg" onClick={() => setEditing("new")} data-tour="products-add">
             <Plus className="size-6" strokeWidth={2.5} /> {t.products.add}
           </Button>
         }
@@ -60,7 +62,7 @@ export default function Products() {
           />
         </div>
       )}
-      <Card>
+      <Card data-tour="products-list">
         {visible.length === 0 ? (
           <EmptyState
             icon={Package}
