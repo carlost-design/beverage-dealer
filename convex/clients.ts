@@ -3,11 +3,11 @@ import type { Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import { cleanText, currentUser, fail, logActivity, requireUser, requireWholeNumber } from "./lib/access";
 import { manilaDate } from "./lib/dates";
-import { describeDiscount } from "./lib/money";
 import { lateInfo, openOrders, openOrdersForClient } from "./lib/orders";
 import { recordEmpties } from "./lib/stock";
-import { discountRule } from "./schema";
 
+// The usual discount isn't here: it is changed only while taking an order
+// (orders.create with saveDiscount).
 const clientFields = v.object({
   name: v.string(),
   storeName: v.optional(v.string()),
@@ -15,7 +15,6 @@ const clientFields = v.object({
   address: v.optional(v.string()),
   termsDays: v.number(),
   creditLimit: v.optional(v.number()),
-  discount: v.optional(discountRule),
   notes: v.optional(v.string()),
 });
 
@@ -25,12 +24,6 @@ function cleanClient(input: Infer<typeof clientFields>) {
   requireWholeNumber(input.termsDays, ["Payment terms", "terms ng bayad"]);
   if (input.termsDays > 365) fail("Payment terms can be at most 365 days.", "Hanggang 365 araw lang ang terms ng bayad.");
   if (input.creditLimit !== undefined) requireWholeNumber(input.creditLimit, ["Credit limit", "credit limit"]);
-  let discount = input.discount;
-  if (discount && discount.value === 0) discount = undefined;
-  if (discount?.type === "percent" && !(discount.value > 0 && discount.value <= 100)) {
-    fail("A percent discount must be between 0 and 100.", "Ang % na discount ay dapat mula 0 hanggang 100.");
-  }
-  if (discount && discount.type !== "percent") requireWholeNumber(discount.value, ["Discount", "discount"]);
   return {
     name,
     storeName: cleanText(input.storeName),
@@ -38,7 +31,6 @@ function cleanClient(input: Infer<typeof clientFields>) {
     address: cleanText(input.address),
     termsDays: input.termsDays,
     creditLimit: input.creditLimit ? input.creditLimit : undefined,
-    discount,
     notes: cleanText(input.notes),
   };
 }
@@ -140,8 +132,15 @@ export const get = query({
       empties.push({ productId: row.productId, name: product?.name ?? "Deleted product", owed: row.owed });
     }
 
+    const discounts = [];
+    for (const { productId, perCase } of client.productDiscounts ?? []) {
+      const product = await ctx.db.get("products", productId);
+      if (product) discounts.push({ productId, name: product.name, perCase });
+    }
+
     return {
       client,
+      discounts: discounts.sort((a, b) => a.name.localeCompare(b.name)),
       openOrders: open,
       balance,
       lateBalance: late.reduce((sum, order) => sum + order.balance, 0),
@@ -175,9 +174,6 @@ export const update = mutation({
     await ctx.db.patch("clients", clientId, fields);
 
     const changes = [];
-    const oldDiscount = existing.discount ? describeDiscount(existing.discount) : "none";
-    const newDiscount = fields.discount ? describeDiscount(fields.discount) : "none";
-    if (oldDiscount !== newDiscount) changes.push(`discount ${oldDiscount} → ${newDiscount}`);
     if (existing.termsDays !== fields.termsDays) {
       changes.push(`terms ${existing.termsDays} → ${fields.termsDays} days`);
     }

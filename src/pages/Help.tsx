@@ -160,8 +160,8 @@ const SECTIONS: Section[] = [
     tips: [
       <>Kusang nababawas sa stock ang mga kahang na-order. Hindi na kailangang bawasan nang mano-mano.</>,
       <>
-        Kusang inilalagay ang karaniwang discount ng suki. Para palitan ito sa isang order lang, pindutin ang{" "}
-        <B>Palitan ang discount</B> sa hakbang 3.
+        May <B>Discount kada kaha</B> sa ilalim ng bawat produkto sa hakbang 2. Kusang nakalagay ang karaniwang discount ng
+        suki. Kapag binago mo ito, itatanong sa hakbang 3 kung <B>Gamitin din sa susunod</B> o <B>Sa order na ito lang</B>.
       </>,
       <>
         Magbababala ang app kapag late sa bayad ang suki, o kapag lalampas siya sa credit limit. Puwede pa ring ituloy ang order.
@@ -316,7 +316,8 @@ const SECTIONS: Section[] = [
         binibilang kung kailan magiging late ang utang.
       </>,
       <>
-        Kung gusto, ilagay ang <B>Credit limit</B> (pinakamalaking utang na puwede) at ang <B>Karaniwang discount</B> ng suki.
+        Kung gusto, ilagay ang <B>Credit limit</B> (pinakamalaking utang na puwede). Ang discount ng suki ay inilalagay sa
+        unang order niya.
       </>,
       <>
         Pindutin ang <B>Idagdag ang suki</B>.

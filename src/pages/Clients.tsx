@@ -101,7 +101,7 @@ export default function Clients() {
                     <div className="min-w-0 flex-1">
                       <ClientName name={client.name} isLate={late} className="block truncate text-lg" />
                       <p className="truncate text-base text-ink-3">
-                        {[client.storeName, fmt.terms(client.termsDays), client.discount && fmt.discount(client.discount)]
+                        {[client.storeName, fmt.terms(client.termsDays)]
                           .filter(Boolean)
                           .join(" · ")}
                       </p>

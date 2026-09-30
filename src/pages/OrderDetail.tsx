@@ -5,6 +5,7 @@ import { Link, useParams } from "react-router";
 import { toast } from "sonner";
 import { api } from "../../convex/_generated/api";
 import type { Doc } from "../../convex/_generated/dataModel";
+import { lineAmount } from "../../convex/lib/money";
 import { ReasonModal, RecordPaymentModal } from "../components/PaymentModals";
 import { PrintPreview } from "../components/print";
 import { ProductTile } from "../components/ProductTile";
@@ -131,15 +132,21 @@ export default function OrderDetail() {
                     <p className="text-base text-ink-3 tabular">
                       {t.common.cases(item.quantity)} × {fmt.money(item.price)}
                     </p>
+                    {item.discountPerCase && (
+                      <p className="text-base font-semibold text-[#146C43] tabular">
+                        {t.flow.lessPerCase(fmt.money(item.discountPerCase))}
+                      </p>
+                    )}
                     {item.returnable && <p className="text-sm text-ink-3">{t.order.emptiesReturned(item.emptiesReturned, item.quantity)}</p>}
                   </div>
-                  <p className="text-lg font-bold tabular">{fmt.money(item.price * item.quantity)}</p>
+                  <p className="text-lg font-bold tabular">{fmt.money(lineAmount(item))}</p>
                 </li>
               ))}
             </ul>
-            <dl className="space-y-2 border-t border-line px-5 py-4 text-lg sm:px-6">
-              <Row label={t.order.subtotal} value={fmt.money(order.subtotal)} />
-              {order.discount && (
+            {/* Whole-order discounts only exist on older orders. */}
+            {order.discount && (
+              <dl className="space-y-2 border-t border-line px-5 py-4 text-lg sm:px-6">
+                <Row label={t.order.subtotal} value={fmt.money(order.subtotal)} />
                 <Row
                   label={
                     <>
@@ -150,8 +157,8 @@ export default function OrderDetail() {
                   value={`−${fmt.money(order.discount.amount)}`}
                   className="text-[#146C43]"
                 />
-              )}
-            </dl>
+              </dl>
+            )}
             <div className="flex items-baseline justify-between gap-3 bg-brand-soft px-5 py-4 sm:px-6">
               <span className="text-xl font-bold">{t.order.total}</span>
               <span className="text-3xl font-bold tracking-tight tabular">{fmt.money(order.total)}</span>

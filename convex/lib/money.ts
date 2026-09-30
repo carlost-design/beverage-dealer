@@ -19,6 +19,11 @@ export function discountAmount(
   return Math.min(Math.max(raw, 0), subtotal);
 }
 
+// What one order line costs after its per-case discount.
+export function lineAmount(item: { price: number; quantity: number; discountPerCase?: number }): number {
+  return (item.price - (item.discountPerCase ?? 0)) * item.quantity;
+}
+
 export function paymentStatusFor(total: number, paid: number): PaymentStatus {
   if (paid >= total) return "paid";
   return paid > 0 ? "partial" : "unpaid";

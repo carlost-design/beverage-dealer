@@ -12,7 +12,6 @@
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, type MutationCtx } from "./_generated/server";
 import { addDays, manilaDate } from "./lib/dates";
-import type { DiscountRule } from "./lib/money";
 import { addPayment, createOrder, type ItemInput } from "./lib/orders";
 import { availableStock, expectedClosing, moveStock, openDay, recordEmpties } from "./lib/stock";
 import { fail } from "./lib/access";
@@ -37,10 +36,10 @@ const CLIENTS: {
   address?: string;
   termsDays: number;
   creditLimit?: number;
-  discount?: DiscountRule;
+  discounts?: Record<string, number>; // product name → centavos off each case
 }[] = [
-  { key: "nena", name: "Aling Nena", storeName: "Nena's Sari-sari Store", phone: "0917 000 0001", address: "Purok 3, Brgy. San Isidro", termsDays: 7, discount: { type: "perCase", value: 500 } },
-  { key: "jun", name: "Mang Jun", storeName: "Jun's Carinderia", phone: "0917 000 0002", address: "Rizal St., Poblacion", termsDays: 15, discount: { type: "percent", value: 2 } },
+  { key: "nena", name: "Aling Nena", storeName: "Nena's Sari-sari Store", phone: "0917 000 0001", address: "Purok 3, Brgy. San Isidro", termsDays: 7, discounts: { "Coke 8oz": 500, "Coke 1.5L PET": 1000 } },
+  { key: "jun", name: "Mang Jun", storeName: "Jun's Carinderia", phone: "0917 000 0002", address: "Rizal St., Poblacion", termsDays: 15, discounts: { "Red Horse 1L": 2000 } },
   { key: "ben", name: "Kuya Ben", storeName: "Ben's Videoke Bar", phone: "0917 000 0003", address: "National Highway, Brgy. Maligaya", termsDays: 0 },
   { key: "liza", name: "Ate Liza", storeName: "Liza Mini Mart", phone: "0917 000 0004", address: "Mabini St., Poblacion", termsDays: 30, creditLimit: 5_000_000 },
   { key: "rudy", name: "Tito Rudy", storeName: "Rudy's Store", phone: "0917 000 0005", address: "Purok 1, Brgy. Bagong Silang", termsDays: 7 },
@@ -138,8 +137,11 @@ export const sampleData = internalMutation({
     }
 
     const clients = new Map<string, Id<"clients">>();
-    for (const { key, ...client } of CLIENTS) {
-      clients.set(key, await ctx.db.insert("clients", { ...client, active: true }));
+    for (const { key, discounts, ...client } of CLIENTS) {
+      const productDiscounts = discounts
+        ? Object.entries(discounts).map(([name, perCase]) => ({ productId: products.get(name)!, perCase }))
+        : undefined;
+      clients.set(key, await ctx.db.insert("clients", { ...client, productDiscounts, active: true }));
     }
 
     const created: { plan: PlannedOrder; orderId: Id<"orders"> }[] = [];
@@ -164,11 +166,14 @@ export const sampleData = internalMutation({
       for (const plan of ORDERS.filter((o) => o.day === daysAgo)) {
         const clientId = clients.get(plan.client)!;
         const client = (await ctx.db.get("clients", clientId))!;
+        const usual = new Map((client.productDiscounts ?? []).map((d) => [d.productId, d.perCase]));
         const items: ItemInput[] = [];
         for (const [name, cases, empties] of plan.lines) {
           const productId = products.get(name)!;
           const quantity = Math.min(cases, await availableStock(ctx, date, productId));
-          if (quantity > 0) items.push({ productId, quantity, emptiesReturned: empties ?? quantity });
+          if (quantity > 0) {
+            items.push({ productId, quantity, emptiesReturned: empties ?? quantity, discountPerCase: usual.get(productId) });
+          }
         }
         if (items.length === 0) continue;
         const { order } = await createOrder(ctx, date, {
@@ -176,7 +181,6 @@ export const sampleData = internalMutation({
           fulfillment: plan.pickup ? "pickup" : "delivery",
           completed: !plan.pending,
           items,
-          discount: client.discount,
         });
         if (plan.payNow) {
           await addPayment(ctx, order, { amount: order.total, method: "cash", date });

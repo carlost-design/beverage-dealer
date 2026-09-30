@@ -78,7 +78,10 @@ export default defineSchema({
     address: v.optional(v.string()),
     termsDays: v.number(), // 0 = pay on delivery / pickup
     creditLimit: v.optional(v.number()),
+    // Old whole-order discount. No longer used; kept so older rows still load.
     discount: v.optional(discountRule),
+    // Usual discount per case for each product, filled in on new orders.
+    productDiscounts: v.optional(v.array(v.object({ productId: v.id("products"), perCase: v.number() }))),
     notes: v.optional(v.string()),
     active: v.boolean(),
   }),
@@ -157,9 +160,11 @@ export default defineSchema({
         quantity: v.number(),
         returnable: v.boolean(),
         emptiesReturned: v.number(),
+        discountPerCase: v.optional(v.number()), // centavos off each case
       }),
     ),
-    subtotal: v.number(),
+    subtotal: v.number(), // after the per-case discounts
+    // Whole-order discount on older orders only. New orders use discountPerCase.
     discount: v.optional(
       v.object({
         type: discountType,

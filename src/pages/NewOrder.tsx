@@ -11,6 +11,8 @@ import {
   Pencil,
   Plus,
   Printer,
+  Receipt,
+  Repeat,
   Store,
   Tag,
   Truck,
@@ -24,7 +26,6 @@ import type { Doc, Id } from "../../convex/_generated/dataModel";
 import type { StockRow } from "../../convex/lib/dayView";
 import { discountAmount } from "../../convex/lib/money";
 import { ClientFormModal } from "../components/ClientFormModal";
-import { DiscountFields, readDiscount, type DiscountDraft } from "../components/DiscountFields";
 import { PrintPreview } from "../components/print";
 import { ProductTile } from "../components/ProductTile";
 import { OrderSlip } from "../components/receipts";
@@ -54,7 +55,8 @@ import { useTourPage } from "../tour/TourProvider";
 
 type ClientRow = NonNullable<ReturnType<typeof useClientList>>[number];
 type ExistingOrder = NonNullable<ReturnType<typeof useOrder>>;
-type Line = { quantity: number; empties: number; emptiesTouched: boolean };
+// discount: pesos off each case, as typed.
+type Line = { quantity: number; empties: number; emptiesTouched: boolean; discount: string };
 type Method = "cash" | "gcash" | "maya" | "bank" | "check";
 type PayMode = "later" | "full" | "part";
 
@@ -108,9 +110,19 @@ export default function NewOrder() {
   );
 }
 
-function draftFrom(rule: { type: DiscountDraft["type"]; value: number } | undefined): DiscountDraft {
-  if (!rule || rule.type === "none") return { type: "none", value: "" };
-  return { type: rule.type, value: rule.type === "percent" ? String(rule.value) : pesoInput(rule.value) };
+// The client's usual discount off each case of a product, in centavos.
+function usualPerCase(client: ClientRow | undefined, productId: Id<"products">): number {
+  return client?.productDiscounts?.find((d) => d.productId === productId)?.perCase ?? 0;
+}
+
+function usualDiscount(client: ClientRow | undefined, productId: Id<"products">): string {
+  const perCase = usualPerCase(client, productId);
+  return perCase ? pesoInput(perCase) : "";
+}
+
+// Centavos off each case; 0 when blank, null when it can't be read.
+function readPerCase(line: Line): number | null {
+  return line.discount.trim() ? parsePeso(line.discount) : 0;
 }
 
 function OrderFlow({
@@ -154,13 +166,16 @@ function OrderFlow({
       (order?.items ?? []).map((item) => [
         item.productId,
         // Lines where every empty came back keep following the case count.
-        { quantity: item.quantity, empties: item.emptiesReturned, emptiesTouched: item.emptiesReturned !== item.quantity },
+        {
+          quantity: item.quantity,
+          empties: item.emptiesReturned,
+          emptiesTouched: item.emptiesReturned !== item.quantity,
+          discount: pesoInput(item.discountPerCase),
+        },
       ]),
     ),
   );
-  const [discount, setDiscount] = useState<DiscountDraft>(() => draftFrom(order ? order.discount : preselected?.discount));
-  const [discountOpen, setDiscountOpen] = useState(false);
-  const [discountNote, setDiscountNote] = useState(order?.discount?.note ?? "");
+  const [discountScope, setDiscountScope] = useState<"keep" | "once">("keep");
   const [notes, setNotes] = useState(order?.notes ?? "");
   const [noteOpen, setNoteOpen] = useState(Boolean(order?.notes));
   const [payMode, setPayMode] = useState<PayMode>("later");
@@ -181,11 +196,22 @@ function OrderFlow({
   const chosen = products
     .map((product) => ({ product, line: lines[product._id] }))
     .filter(({ line }) => line && (line.quantity > 0 || line.empties > 0));
-  const subtotal = chosen.reduce((sum, { product, line }) => sum + priceOf(product) * line.quantity, 0);
+  const perCaseOf = (product: Doc<"products">, line: Line) => Math.min(readPerCase(line) ?? 0, priceOf(product));
+  const subtotal = chosen.reduce((sum, { product, line }) => sum + (priceOf(product) - perCaseOf(product, line)) * line.quantity, 0);
   const cases = chosen.reduce((sum, { line }) => sum + line.quantity, 0);
-  const rule = readDiscount(discount);
-  const discountValue = rule ? discountAmount(rule, subtotal, cases) : 0;
-  const total = subtotal - discountValue;
+  const badDiscount = chosen.find(({ product, line }) => {
+    const perCase = readPerCase(line);
+    return line.quantity > 0 && (perCase === null || perCase > priceOf(product));
+  });
+  // Older orders may carry a whole-order discount; it is kept when they are edited.
+  const oldDiscount = order?.discount;
+  const oldDiscountValue = discountAmount(oldDiscount, subtotal, cases);
+  const total = subtotal - oldDiscountValue;
+  // Only new orders can change the client's usual discounts.
+  const discountChanges = editing
+    ? []
+    : chosen.filter(({ product, line }) => line.quantity > 0 && readPerCase(line) !== usualPerCase(client, product._id));
+  const saveDiscount = discountChanges.length > 0 && discountScope === "keep";
   const emptiesOwed = chosen
     .filter(({ product }) => product.returnable)
     .reduce((sum, { line }) => sum + line.quantity - line.empties, 0);
@@ -202,7 +228,7 @@ function OrderFlow({
     if (name === "client") return true;
     if (!client) return false;
     if (name === "cases") return true;
-    return cases > 0 && overStock.length === 0;
+    return cases > 0 && overStock.length === 0 && !badDiscount;
   };
   const requested = Math.max(1, Math.min(steps.length, Number(params.get("step") ?? (preselected && !editing ? 2 : 1)) || 1));
   let stepIndex = requested - 1;
@@ -223,15 +249,27 @@ function OrderFlow({
     setClientId(id);
     if (next) {
       setAddress(next.address ?? "");
-      setDiscount(draftFrom(next.discount));
-      setDiscountNote("");
+      setLines((current) =>
+        Object.fromEntries(
+          Object.entries(current).map(([productId, line]) => [
+            productId,
+            { ...line, discount: usualDiscount(next, productId as Id<"products">) },
+          ]),
+        ),
+      );
+      setDiscountScope("keep");
     }
     goTo(1);
   }
 
   function setLine(product: Doc<"products">, change: Partial<Line>) {
     setLines((current) => {
-      const line = current[product._id] ?? { quantity: 0, empties: 0, emptiesTouched: false };
+      const line = current[product._id] ?? {
+        quantity: 0,
+        empties: 0,
+        emptiesTouched: false,
+        discount: usualDiscount(client, product._id),
+      };
       const next = { ...line, ...change };
       // Empty cases follow the case count until someone changes them by hand.
       if (change.quantity !== undefined && !next.emptiesTouched) {
@@ -246,9 +284,11 @@ function OrderFlow({
     if (step === "cases") {
       if (cases === 0) return t.flow.addCases;
       if (overStock.length) return t.flow.notEnoughStock(overStock.map((i) => i.product.name).join(", "));
+      if (badDiscount) {
+        return readPerCase(badDiscount.line) === null ? t.discount.checkAmount : t.flow.discountTooBig(badDiscount.product.name);
+      }
     }
     if (step === "details") {
-      if (rule === null) return t.discount.checkAmount;
       if (payMode === "part" && (paid === null || paid <= 0 || paid >= total)) return t.flow.partialAmount;
     }
     if (step === "review" && dayClosed) return t.flow.dayClosed;
@@ -268,12 +308,12 @@ function OrderFlow({
       productId: product._id,
       quantity: line.quantity,
       emptiesReturned: product.returnable ? line.empties : 0,
+      discountPerCase: line.quantity > 0 ? (readPerCase(line) ?? 0) : 0,
     }));
-    const discountInput = rule ? { ...rule, note: discountNote } : undefined;
     setSaving(true);
     try {
       if (order) {
-        await updateItems({ orderId: order._id, items, discount: discountInput });
+        await updateItems({ orderId: order._id, items });
         await updateDetails({ orderId: order._id, fulfillment, deliveryAddress: address, notes });
         toast.success(t.order.saved);
         navigate(`/orders/${order._id}`);
@@ -284,7 +324,7 @@ function OrderFlow({
           completed: fulfillment === "pickup" && takingNow,
           deliveryAddress: fulfillment === "delivery" ? address : undefined,
           items,
-          discount: discountInput,
+          saveDiscount,
           notes,
           payment: payMode !== "later" && paid ? { amount: paid, method, reference } : undefined,
         });
@@ -396,6 +436,7 @@ function OrderFlow({
                         line={lines[product._id]}
                         available={available(product._id)}
                         onChange={(change) => setLine(product, change)}
+                        onDiscount={(discount) => setLine(product, { discount })}
                       />
                     ))}
                   </ul>
@@ -474,36 +515,49 @@ function OrderFlow({
             </Card>
           )}
 
-          <Card className="p-5 sm:p-6" data-tour="flow-discount">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
+          {discountChanges.length > 0 && client && (
+            <Card className="p-5 sm:p-6" data-tour="flow-discount">
+              <div className="mb-4 flex items-center gap-3">
                 <span className="flex size-11 items-center justify-center rounded-xl bg-[#E8F7EE] text-[#16A34A]">
                   <Tag className="size-6" />
                 </span>
-                <div>
-                  <p className="text-xl font-bold text-ink">{t.flow.discount}</p>
-                  <p className="text-base text-ink-3">
-                    {rule ? fmt.discount(rule) : client?.discount ? t.flow.usualDiscount(fmt.discount(client.discount)) : t.flow.noUsualDiscount}
-                  </p>
-                </div>
+                <h2 className="text-xl font-bold text-ink">{t.flow.discountChanged}</h2>
               </div>
-              {!discountOpen && (
-                <Button variant="secondary" size="sm" onClick={() => setDiscountOpen(true)}>
-                  <Pencil className="size-4" /> {t.flow.changeDiscount}
-                </Button>
-              )}
-            </div>
-            {discountOpen && (
-              <div className="mt-4 space-y-4">
-                <DiscountFields label={t.flow.discount} value={discount} onChange={setDiscount} />
-                {rule && (
-                  <Field label={t.flow.discountReason} hint={t.common.optional}>
-                    <Input value={discountNote} onChange={(e) => setDiscountNote(e.target.value)} />
-                  </Field>
-                )}
-              </div>
-            )}
-          </Card>
+              <ul className="mb-5 space-y-1 text-base text-ink-2">
+                {discountChanges.map(({ product, line }) => (
+                  <li key={product._id} className="tabular">
+                    {t.flow.discountChange(
+                      product.name,
+                      fmt.money(usualPerCase(client, product._id)),
+                      fmt.money(readPerCase(line) ?? 0),
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <p className="mb-2 text-base font-semibold text-ink-2">{t.flow.discountNext}</p>
+              <ChoiceCards
+                label={t.flow.discountNext}
+                value={discountScope}
+                onChange={setDiscountScope}
+                options={[
+                  {
+                    value: "keep",
+                    label: t.flow.discountKeep,
+                    description: t.flow.discountKeepHint(client.name),
+                    icon: Repeat,
+                    tone: "green",
+                  },
+                  {
+                    value: "once",
+                    label: t.flow.discountOnce,
+                    description: t.flow.discountOnceHint,
+                    icon: Receipt,
+                    tone: "amber",
+                  },
+                ]}
+              />
+            </Card>
+          )}
 
           <Card className="p-5 sm:p-6" data-tour="flow-note">
             {noteOpen ? (
@@ -535,25 +589,30 @@ function OrderFlow({
                     <p className="text-base text-ink-3 tabular">
                       {t.common.cases(line.quantity)} × {fmt.money(priceOf(product))}
                     </p>
+                    {perCaseOf(product, line) > 0 && (
+                      <p className="text-base font-semibold text-[#146C43] tabular">
+                        {t.flow.lessPerCase(fmt.money(perCaseOf(product, line)))}
+                      </p>
+                    )}
                   </div>
-                  <p className="text-lg font-bold tabular">{fmt.money(priceOf(product) * line.quantity)}</p>
+                  <p className="text-lg font-bold tabular">
+                    {fmt.money((priceOf(product) - perCaseOf(product, line)) * line.quantity)}
+                  </p>
                 </li>
               ))}
           </ul>
-          <dl className="space-y-2 border-t border-line px-5 py-4 text-lg sm:px-6">
-            <div className="flex justify-between gap-3">
-              <dt className="text-ink-3">{t.flow.subtotal}</dt>
-              <dd className="font-semibold tabular">{fmt.money(subtotal)}</dd>
-            </div>
-            {discountValue > 0 && rule && (
-              <div className="flex justify-between gap-3 text-[#146C43]">
-                <dt>
-                  {t.flow.discount} ({fmt.discount(rule)})
-                </dt>
-                <dd className="font-semibold tabular">−{fmt.money(discountValue)}</dd>
+          {oldDiscount && oldDiscountValue > 0 && (
+            <dl className="space-y-2 border-t border-line px-5 py-4 text-lg sm:px-6">
+              <div className="flex justify-between gap-3">
+                <dt className="text-ink-3">{t.flow.subtotal}</dt>
+                <dd className="font-semibold tabular">{fmt.money(subtotal)}</dd>
               </div>
-            )}
-          </dl>
+              <div className="flex justify-between gap-3 text-[#146C43]">
+                <dt>{t.order.discount(fmt.discount(oldDiscount))}</dt>
+                <dd className="font-semibold tabular">−{fmt.money(oldDiscountValue)}</dd>
+              </div>
+            </dl>
+          )}
           <div className="flex items-baseline justify-between gap-3 bg-brand-soft px-5 py-5 sm:px-6">
             <span className="text-xl font-bold text-ink">{t.flow.total}</span>
             <span className="text-[2.5rem] leading-none font-bold tracking-tight text-ink tabular">{fmt.money(total)}</span>
@@ -583,6 +642,12 @@ function OrderFlow({
                 <span>
                   {emptiesOwed > 0 ? t.flow.emptiesOwe(emptiesOwed) : emptiesOwed < 0 ? t.flow.emptiesExtra(-emptiesOwed) : t.flow.emptiesAll}
                 </span>
+              </li>
+            )}
+            {saveDiscount && (
+              <li className="flex items-start gap-3">
+                <Tag className="mt-0.5 size-6 shrink-0 text-ink-3" />
+                <span>{t.flow.discountRemembered(client.name)}</span>
               </li>
             )}
             {notes.trim() && (
@@ -699,17 +764,22 @@ function ProductLine({
   line,
   available,
   onChange,
+  onDiscount,
 }: {
   product: Doc<"products">;
   price: number;
   line?: Line;
   available: number;
   onChange: (change: Partial<Line>) => void;
+  onDiscount: (discount: string) => void;
 }) {
   const t = useT();
   const fmt = useFmt();
   const quantity = line?.quantity ?? 0;
   const empties = line?.empties ?? 0;
+  const perCase = line ? readPerCase(line) : 0;
+  const discountError = perCase === null ? t.discount.checkAmount : perCase > price ? t.flow.discountTooBig(product.name) : null;
+  const showEmpties = product.returnable && (quantity > 0 || empties > 0);
   const out = available <= 0;
   const low = !out && product.lowStockLevel > 0 && available <= product.lowStockLevel;
   return (
@@ -728,18 +798,49 @@ function ProductLine({
         </div>
         <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:flex-col sm:items-end">
           <Stepper value={quantity} onChange={(q) => onChange({ quantity: q })} max={Math.max(available, quantity)} label={product.name} />
-          {quantity > 0 && <span className="text-lg font-bold tabular">{fmt.money(price * quantity)}</span>}
+          {quantity > 0 && (
+            <span className="text-lg font-bold tabular">{fmt.money((price - Math.min(perCase ?? 0, price)) * quantity)}</span>
+          )}
         </div>
       </div>
-      {product.returnable && (quantity > 0 || empties > 0) && (
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white px-4 py-2.5 sm:justify-end">
-          <span className="text-base font-semibold text-ink-2">{t.flow.emptiesReturned}</span>
-          <Stepper
-            size="sm"
-            value={empties}
-            onChange={(e) => onChange({ empties: e, emptiesTouched: true })}
-            label={`${t.flow.emptiesReturned}: ${product.name}`}
-          />
+      {(showEmpties || quantity > 0) && (
+        <div className="mt-3 divide-y divide-line rounded-xl bg-white px-4">
+          {showEmpties && (
+            <div className="flex flex-wrap items-center justify-between gap-3 py-2.5 sm:justify-end">
+              <span className="text-base font-semibold text-ink-2">{t.flow.emptiesReturned}</span>
+              <Stepper
+                size="sm"
+                value={empties}
+                onChange={(e) => onChange({ empties: e, emptiesTouched: true })}
+                label={`${t.flow.emptiesReturned}: ${product.name}`}
+              />
+            </div>
+          )}
+          {quantity > 0 && (
+            <div className="py-2.5" data-tour="flow-line-discount">
+              <div className="flex flex-wrap items-center justify-between gap-3 sm:justify-end">
+                <span className="text-base font-semibold text-ink-2">{t.flow.discountPerCase}</span>
+                <PesoInput
+                  value={line?.discount ?? ""}
+                  onChange={onDiscount}
+                  placeholder="0"
+                  className="w-36"
+                  aria-label={`${t.flow.discountPerCase}: ${product.name}`}
+                  aria-invalid={discountError ? true : undefined}
+                />
+              </div>
+              {discountError ? (
+                <p className="mt-1 text-right text-base font-semibold text-[#B42318]">{discountError}</p>
+              ) : (
+                perCase !== null &&
+                perCase > 0 && (
+                  <p className="mt-1 text-right text-base font-semibold text-[#146C43] tabular">
+                    −{fmt.money(perCase * quantity)}
+                  </p>
+                )
+              )}
+            </div>
+          )}
         </div>
       )}
     </li>

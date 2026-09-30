@@ -4,12 +4,13 @@ import { query, type QueryCtx } from "./_generated/server";
 import { currentUser } from "./lib/access";
 import { addDays } from "./lib/dates";
 import { dayView } from "./lib/dayView";
+import { lineAmount } from "./lib/money";
 import { lateInfo, openOrders } from "./lib/orders";
 
 const PERIOD = 30;
 
 function profitOf(order: Doc<"orders">) {
-  const margin = order.items.reduce((sum, item) => sum + (item.price - item.cost) * item.quantity, 0);
+  const margin = order.items.reduce((sum, item) => sum + lineAmount(item) - item.cost * item.quantity, 0);
   return margin - (order.discount?.amount ?? 0);
 }
 
@@ -174,7 +175,7 @@ export const reports = query({
       for (const item of order.items) {
         const entry = productTotals.get(item.productId) ?? { productId: item.productId, name: item.name, cases: 0, sales: 0 };
         entry.cases += item.quantity;
-        entry.sales += item.price * item.quantity;
+        entry.sales += lineAmount(item);
         productTotals.set(item.productId, entry);
       }
       const entry = clientTotals.get(order.clientId) ?? { sales: 0, orders: 0 };
