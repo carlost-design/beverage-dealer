@@ -58,6 +58,7 @@ export default defineSchema({
     paperWidth: v.union(v.literal("58mm"), v.literal("80mm")),
     receiptCopies: v.number(),
     language: v.optional(v.union(v.literal("en"), v.literal("fil"))),
+    depositPerCase: v.optional(v.number()), // deposit for each case a client keeps
   }),
 
   products: defineTable({
@@ -163,7 +164,7 @@ export default defineSchema({
         discountPerCase: v.optional(v.number()), // centavos off each case
       }),
     ),
-    subtotal: v.number(), // after the per-case discounts
+    subtotal: v.number(), // after the per-case discounts, before deposits and refunds
     // Whole-order discount on older orders only. New orders use discountPerCase.
     discount: v.optional(
       v.object({
@@ -173,6 +174,11 @@ export default defineSchema({
         note: v.optional(v.string()),
       }),
     ),
+    // Cases the client paid a deposit on (added to the total) and deposit cases
+    // they brought back (subtracted), at depositPerCase each.
+    depositCases: v.optional(v.number()),
+    refundCases: v.optional(v.number()),
+    depositPerCase: v.optional(v.number()),
     total: v.number(),
     amountPaid: v.number(),
     paymentStatus: v.union(

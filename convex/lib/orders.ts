@@ -2,7 +2,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { cleanText, fail, requireWholeNumber } from "./access";
 import { addDays, daysBetween } from "./dates";
-import { discountAmount, formatPeso, lineAmount, paymentStatusFor } from "./money";
+import { depositNet, discountAmount, formatPeso, lineAmount, paymentStatusFor } from "./money";
 import { availableStock, moveStock, openDay, recordEmpties } from "./stock";
 
 export type OrderItem = Doc<"orders">["items"][number];
@@ -24,9 +24,37 @@ export type OrderInput = {
   completed?: boolean;
   deliveryAddress?: string;
   items: ItemInput[];
+  depositCases?: number;
+  refundCases?: number;
   notes?: string;
   payment?: PaymentInput;
 };
+
+export type DepositInput = { depositCases?: number; refundCases?: number };
+
+// The deposit and refund cases on an order, with the price per case. An order
+// keeps the price it was made with; new orders use the one in Settings.
+export async function buildDeposits(ctx: QueryCtx, input: DepositInput, existing?: Doc<"orders">) {
+  const depositCases = input.depositCases ?? 0;
+  const refundCases = input.refundCases ?? 0;
+  requireWholeNumber(depositCases, ["Deposit", "deposit"]);
+  requireWholeNumber(refundCases, ["Refund", "refund"]);
+  if (depositCases === 0 && refundCases === 0) return {};
+  const settings = await ctx.db.query("settings").first();
+  const depositPerCase = existing?.depositPerCase ?? settings?.depositPerCase ?? 0;
+  if (depositPerCase === 0) {
+    fail(
+      "There is no deposit price yet. Add it on the Settings page first.",
+      "Wala pang presyo ng deposit. Ilagay muna ito sa Settings.",
+    );
+  }
+  return {
+    depositCases: depositCases > 0 ? depositCases : undefined,
+    refundCases: refundCases > 0 ? refundCases : undefined,
+    depositPerCase,
+  };
+}
+type Deposits = Awaited<ReturnType<typeof buildDeposits>>;
 
 // Merges duplicate lines and snapshots prices. Lines already on the order keep
 // the price they were sold at.
@@ -82,15 +110,22 @@ export async function buildItems(
 type OrderDiscount = NonNullable<Doc<"orders">["discount"]>;
 
 // The whole-order discount only exists on older orders; it is recalculated
-// when one of them is edited.
-export function orderTotals(items: OrderItem[], oldDiscount?: OrderDiscount) {
+// when one of them is edited. Deposits are added and refunds taken off after it.
+export function orderTotals(items: OrderItem[], deposits: Deposits, oldDiscount?: OrderDiscount) {
   const subtotal = items.reduce((sum, item) => sum + lineAmount(item), 0);
   const cases = items.reduce((sum, item) => sum + item.quantity, 0);
   const amount = discountAmount(oldDiscount, subtotal, cases);
+  const total = subtotal - amount + depositNet(deposits);
+  if (total < 0) {
+    fail(
+      `The refund is more than the order. Lower the refund by ${formatPeso(-total)}.`,
+      `Mas malaki ang refund kaysa sa order. Bawasan ang refund ng ${formatPeso(-total)}.`,
+    );
+  }
   return {
     subtotal,
     discount: oldDiscount ? { ...oldDiscount, amount } : undefined,
-    total: subtotal - amount,
+    total,
   };
 }
 
@@ -222,7 +257,8 @@ export async function createOrder(ctx: MutationCtx, date: string, input: OrderIn
 
   const items = await buildItems(ctx, input.items);
   await assertStock(ctx, date, items, []);
-  const totals = orderTotals(items);
+  const deposits = await buildDeposits(ctx, input);
+  const totals = orderTotals(items, deposits);
   const orderId = await ctx.db.insert("orders", {
     orderNo: await nextOrderNo(ctx),
     date,
@@ -235,6 +271,7 @@ export async function createOrder(ctx: MutationCtx, date: string, input: OrderIn
         : undefined,
     items,
     subtotal: totals.subtotal,
+    ...deposits,
     total: totals.total,
     amountPaid: 0,
     paymentStatus: paymentStatusFor(totals.total, 0),
@@ -257,11 +294,13 @@ export async function updateOrderItems(
   order: Doc<"orders">,
   date: string,
   inputs: ItemInput[],
+  depositInput: DepositInput,
 ) {
   await openDay(ctx, date);
   const items = await buildItems(ctx, inputs, order.items);
   await assertStock(ctx, date, items, order.items);
-  const totals = orderTotals(items, order.discount);
+  const deposits = await buildDeposits(ctx, depositInput, order);
+  const totals = orderTotals(items, deposits, order.discount);
   if (totals.total < order.amountPaid) {
     fail(
       `This order already has ${formatPeso(order.amountPaid)} in payments, which is more than the new total. Remove a payment first.`,
@@ -274,6 +313,9 @@ export async function updateOrderItems(
   await ctx.db.patch("orders", order._id, {
     items,
     subtotal: totals.subtotal,
+    depositCases: deposits.depositCases,
+    refundCases: deposits.refundCases,
+    depositPerCase: deposits.depositPerCase,
     discount: totals.discount,
     total: totals.total,
     paymentStatus,

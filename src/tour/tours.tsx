@@ -355,6 +355,16 @@ const tours = {
         ),
       },
       {
+        target: "flow-deposit",
+        title: "Deposit at Refund",
+        body: (
+          <>
+            <B>Deposit</B>: ilang kaha ang hindi ibabalik at babayaran ng suki. Dagdag ito sa kabuuan. <B>Refund</B>: ilang kahang
+            may deposit ang ibinalik niya. Bawas ito sa kabuuan.
+          </>
+        ),
+      },
+      {
         target: "flow-save",
         title: "I-save ang order",
         body: (
@@ -672,6 +682,16 @@ const tours = {
           <>
             Pangalan, address at telepono na lalabas sa resibo, ang laki ng papel (58 o 80 mm), at ilang kopya. Pindutin ang{" "}
             <B>Subukang mag-print</B> para makita ang labas.
+          </>
+        ),
+      },
+      {
+        target: "settings-deposit",
+        title: "Deposit ng kaha",
+        body: (
+          <>
+            Ang sinisingil sa bawat kahang hindi ibinalik ng suki. Ito ang gagamitin sa <B>Deposit</B> at <B>Refund</B> ng mga
+            bagong order.
           </>
         ),
       },

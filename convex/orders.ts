@@ -154,6 +154,8 @@ export const create = mutation({
     completed: v.optional(v.boolean()),
     deliveryAddress: v.optional(v.string()),
     items: v.array(itemInput),
+    depositCases: v.optional(v.number()),
+    refundCases: v.optional(v.number()),
     // Also remember these per-case discounts for the client's next orders.
     saveDiscount: v.optional(v.boolean()),
     notes: v.optional(v.string()),
@@ -174,6 +176,11 @@ export const create = mutation({
     const discount = discounted.length
       ? `, discount ${discounted.map((item) => `${item.name} ${formatPeso(item.discountPerCase!)}/case`).join(", ")}`
       : "";
+    const deposits = [
+      saved.depositCases ? `deposit ${saved.depositCases} cases` : "",
+      saved.refundCases ? `refund ${saved.refundCases} cases` : "",
+    ].filter(Boolean);
+    const depositNote = deposits.length ? `, ${deposits.join(", ")} at ${formatPeso(saved.depositPerCase ?? 0)}` : "";
     const changes = saved.items.filter(
       (item) => item.quantity > 0 && (item.discountPerCase ?? 0) !== (usual.get(item.productId) ?? 0),
     );
@@ -181,7 +188,7 @@ export const create = mutation({
       ctx,
       userId,
       "Created order",
-      `Order #${saved.orderNo} for ${client.name}: ${formatPeso(saved.total)}${discount}${
+      `Order #${saved.orderNo} for ${client.name}: ${formatPeso(saved.total)}${discount}${depositNote}${
         changes.length && !saveDiscount ? " (this order only)" : ""
       }`,
     );
@@ -210,8 +217,10 @@ export const update = mutation({
   args: {
     orderId: v.id("orders"),
     items: v.array(itemInput),
+    depositCases: v.optional(v.number()),
+    refundCases: v.optional(v.number()),
   },
-  handler: async (ctx, { orderId, items }) => {
+  handler: async (ctx, { orderId, items, depositCases, refundCases }) => {
     const userId = await requireUser(ctx);
     const order = await getActiveOrder(ctx, orderId);
     const today = manilaDate();
@@ -221,7 +230,7 @@ export const update = mutation({
         "Ang mga order lang ngayong araw ang puwedeng baguhin. I-cancel ito at gumawa ng bagong order.",
       );
     }
-    const totals = await updateOrderItems(ctx, order, today, items);
+    const totals = await updateOrderItems(ctx, order, today, items, { depositCases, refundCases });
     await logActivity(
       ctx,
       userId,

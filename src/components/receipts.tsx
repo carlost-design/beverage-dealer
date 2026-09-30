@@ -110,6 +110,28 @@ export function OrderSlip({
               <div className="muted">&nbsp;&nbsp;{fmt.discount(order.discount)}</div>
             </>
           )}
+          {(order.depositCases || order.refundCases) && order.depositPerCase ? (
+            <>
+              {!order.discount && (
+                <div className="row">
+                  <span>{r.subtotal}</span>
+                  <span>{amount(order.subtotal)}</span>
+                </div>
+              )}
+              {order.depositCases ? (
+                <div className="row">
+                  <span>{r.deposit(order.depositCases, amount(order.depositPerCase))}</span>
+                  <span>{amount(order.depositCases * order.depositPerCase)}</span>
+                </div>
+              ) : null}
+              {order.refundCases ? (
+                <div className="row">
+                  <span>{r.refund(order.refundCases, amount(order.depositPerCase))}</span>
+                  <span>-{amount(order.refundCases * order.depositPerCase)}</span>
+                </div>
+              ) : null}
+            </>
+          ) : null}
           <div className="row bold big">
             <span>{r.total}</span>
             <span>{formatPeso(order.total)}</span>

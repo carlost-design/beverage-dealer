@@ -3,7 +3,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import { cleanText, currentUser, fail, logActivity, requireUser, requireWholeNumber } from "./lib/access";
 import { manilaDate } from "./lib/dates";
-import { formatPeso } from "./lib/money";
+import { depositNet, formatPeso } from "./lib/money";
 import { dayView } from "./lib/dayView";
 import {
   availableStock,
@@ -50,7 +50,7 @@ export const recentDays = query({
           (sum, row) => sum + (row.counted === undefined ? 0 : row.counted - expectedClosing(row)),
           0,
         ),
-        sales: orders.filter((o) => !o.voided).reduce((sum, o) => sum + o.total, 0),
+        sales: orders.filter((o) => !o.voided).reduce((sum, o) => sum + o.total - depositNet(o), 0),
       });
     }
     return result;
