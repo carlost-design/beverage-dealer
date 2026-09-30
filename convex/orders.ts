@@ -4,7 +4,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import { cleanText, currentUser, fail, logActivity, requireUser } from "./lib/access";
 import { manilaDate } from "./lib/dates";
-import { describeDiscount, formatPeso } from "./lib/money";
+import { formatPeso } from "./lib/money";
 import {
   applyEmptiesChanges,
   applyStockChanges,
@@ -15,17 +15,13 @@ import {
   updateOrderItems,
 } from "./lib/orders";
 import { getDayDoc, moveStock, openDay } from "./lib/stock";
-import { discountType, paymentMethod } from "./schema";
+import { paymentMethod } from "./schema";
 
 const itemInput = v.object({
   productId: v.id("products"),
   quantity: v.number(),
   emptiesReturned: v.number(),
-});
-const discountInput = v.object({
-  type: discountType,
-  value: v.number(),
-  note: v.optional(v.string()),
+  discountPerCase: v.optional(v.number()),
 });
 const fulfillment = v.union(v.literal("delivery"), v.literal("pickup"));
 
@@ -158,7 +154,8 @@ export const create = mutation({
     completed: v.optional(v.boolean()),
     deliveryAddress: v.optional(v.string()),
     items: v.array(itemInput),
-    discount: v.optional(discountInput),
+    // Also remember these per-case discounts for the client's next orders.
+    saveDiscount: v.optional(v.boolean()),
     notes: v.optional(v.string()),
     payment: v.optional(
       v.object({
@@ -168,25 +165,43 @@ export const create = mutation({
       }),
     ),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, { saveDiscount, ...args }) => {
     const userId = await requireUser(ctx);
     const { order, client } = await createOrder(ctx, manilaDate(), args);
     const saved = (await ctx.db.get("orders", order._id))!;
-    const discount = saved.discount
-      ? `, discount ${formatPeso(saved.discount.amount)} (${describeDiscount(saved.discount)}${
-          client.discount &&
-          client.discount.type === saved.discount.type &&
-          client.discount.value === saved.discount.value
-            ? ""
-            : ", changed from the client's usual discount"
-        })`
+    const usual = new Map((client.productDiscounts ?? []).map((d) => [d.productId, d.perCase]));
+    const discounted = saved.items.filter((item) => item.discountPerCase);
+    const discount = discounted.length
+      ? `, discount ${discounted.map((item) => `${item.name} ${formatPeso(item.discountPerCase!)}/case`).join(", ")}`
       : "";
+    const changes = saved.items.filter(
+      (item) => item.quantity > 0 && (item.discountPerCase ?? 0) !== (usual.get(item.productId) ?? 0),
+    );
     await logActivity(
       ctx,
       userId,
       "Created order",
-      `Order #${saved.orderNo} for ${client.name}: ${formatPeso(saved.total)}${discount}`,
+      `Order #${saved.orderNo} for ${client.name}: ${formatPeso(saved.total)}${discount}${
+        changes.length && !saveDiscount ? " (this order only)" : ""
+      }`,
     );
+    if (saveDiscount && changes.length) {
+      const before = changes.map((item) => `${item.name} ${formatPeso(usual.get(item.productId) ?? 0)}`);
+      for (const item of changes) usual.set(item.productId, item.discountPerCase ?? 0);
+      await ctx.db.patch("clients", client._id, {
+        productDiscounts: [...usual]
+          .filter(([, perCase]) => perCase > 0)
+          .map(([productId, perCase]) => ({ productId, perCase })),
+      });
+      await logActivity(
+        ctx,
+        userId,
+        "Changed usual discount",
+        `${client.name}: ${changes
+          .map((item, i) => `${before[i]} → ${formatPeso(item.discountPerCase ?? 0)}`)
+          .join(", ")} per case (from order #${saved.orderNo})`,
+      );
+    }
     return saved._id;
   },
 });
@@ -195,9 +210,8 @@ export const update = mutation({
   args: {
     orderId: v.id("orders"),
     items: v.array(itemInput),
-    discount: v.optional(discountInput),
   },
-  handler: async (ctx, { orderId, items, discount }) => {
+  handler: async (ctx, { orderId, items }) => {
     const userId = await requireUser(ctx);
     const order = await getActiveOrder(ctx, orderId);
     const today = manilaDate();
@@ -207,7 +221,7 @@ export const update = mutation({
         "Ang mga order lang ngayong araw ang puwedeng baguhin. I-cancel ito at gumawa ng bagong order.",
       );
     }
-    const totals = await updateOrderItems(ctx, order, today, { items, discount });
+    const totals = await updateOrderItems(ctx, order, today, items);
     await logActivity(
       ctx,
       userId,

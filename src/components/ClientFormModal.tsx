@@ -5,7 +5,6 @@ import { api } from "../../convex/_generated/api";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
 import { useErrorMessage, useT } from "../i18n";
 import { parsePeso, pesoInput } from "../lib/format";
-import { DiscountFields, readDiscount, type DiscountDraft } from "./DiscountFields";
 import { Alert, Button, Field, Input, Modal, PesoInput, Select, Textarea } from "./ui";
 
 const TERM_PRESETS = [0, 7, 15, 30];
@@ -51,14 +50,6 @@ function ClientForm({
   const [termsChoice, setTermsChoice] = useState(TERM_PRESETS.includes(initialTerms) ? String(initialTerms) : "custom");
   const [customTerms, setCustomTerms] = useState(String(initialTerms));
   const [creditLimit, setCreditLimit] = useState(pesoInput(client?.creditLimit));
-  const [discount, setDiscount] = useState<DiscountDraft>(() => ({
-    type: client?.discount?.type ?? "none",
-    value: client?.discount
-      ? client.discount.type === "percent"
-        ? String(client.discount.value)
-        : pesoInput(client.discount.value)
-      : "",
-  }));
   const [notes, setNotes] = useState(client?.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,10 +61,8 @@ function ClientForm({
     if (!Number.isInteger(termsDays) || termsDays < 0) return setError(t.clientForm.termsError);
     const limit = creditLimit.trim() ? parsePeso(creditLimit) : undefined;
     if (limit === null) return setError(t.clientForm.limitError);
-    const rule = readDiscount(discount);
-    if (rule === null) return setError(t.clientForm.discountError);
 
-    const fields = { name, storeName, phone, address, termsDays, creditLimit: limit, discount: rule, notes };
+    const fields = { name, storeName, phone, address, termsDays, creditLimit: limit, notes };
     setSaving(true);
     try {
       if (client) {
@@ -131,7 +120,6 @@ function ClientForm({
       <Field label={t.clientForm.creditLimit} hint={t.clientForm.creditLimitHint}>
         <PesoInput value={creditLimit} onChange={setCreditLimit} placeholder={t.clientForm.noLimit} />
       </Field>
-      <DiscountFields label={t.clientForm.usualDiscount} hint={t.clientForm.usualDiscountHint} value={discount} onChange={setDiscount} />
       <Field label={t.clientForm.notes} hint={t.common.optional}>
         <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
       </Field>

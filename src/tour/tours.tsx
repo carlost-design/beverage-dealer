@@ -278,6 +278,16 @@ const tours = {
         ),
       },
       {
+        target: "flow-line-discount",
+        title: "Discount kada kaha",
+        body: (
+          <>
+            Sa ilalim ng bawat produkto, ilagay kung magkano ang bawas sa bawat kaha. Kusang nakalagay ang karaniwang discount ng
+            suki para sa produktong iyon. Iwanang blangko kung walang discount.
+          </>
+        ),
+      },
+      {
         target: "flow-bar",
         title: "Kabuuan at Susunod",
         body: (
@@ -312,10 +322,11 @@ const tours = {
       },
       {
         target: "flow-discount",
-        title: "Discount",
+        title: "Binagong discount",
         body: (
           <>
-            Kusang nakalagay ang karaniwang discount ng suki. Pindutin ang <B>Palitan ang discount</B> kung iba ngayon.
+            Lalabas ito kapag binago mo ang discount ng isang produkto. Piliin ang <B>Gamitin din sa susunod</B> para ito na ang
+            ilalagay sa mga susunod na order ng suki, o <B>Sa order na ito lang</B>.
           </>
         ),
       },
@@ -534,7 +545,7 @@ const tours = {
       {
         target: "clients-add",
         title: "Magdagdag ng suki",
-        body: <>Ilagay ang pangalan, tindahan, terms ng bayad, credit limit at karaniwang discount.</>,
+        body: <>Ilagay ang pangalan, tindahan, terms ng bayad at credit limit. Ang discount ay inilalagay habang nag-o-order.</>,
       },
     ],
   },
@@ -566,7 +577,8 @@ const tours = {
         title: "Detalye",
         body: (
           <>
-            Telepono, address, terms, discount at credit limit. Pindutin ang <B>Baguhin</B> para palitan.
+            Telepono, address, terms, discount at credit limit. Pindutin ang <B>Baguhin</B> para palitan. Ang discount ay binabago
+            habang nag-o-order.
           </>
         ),
       },

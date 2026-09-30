@@ -84,6 +84,12 @@ export function OrderSlip({
                   </span>
                   <span>{amount(item.price * item.quantity)}</span>
                 </div>
+                {item.discountPerCase && (
+                  <div className="row">
+                    <span>&nbsp;&nbsp;{r.lessPerCase(amount(item.discountPerCase))}</span>
+                    <span>-{amount(item.discountPerCase * item.quantity)}</span>
+                  </div>
+                )}
               </Fragment>
             ))}
           <div className="rule" />
@@ -91,12 +97,12 @@ export function OrderSlip({
             <span>{r.cases}</span>
             <span>{cases}</span>
           </div>
-          <div className="row">
-            <span>{r.subtotal}</span>
-            <span>{amount(order.subtotal)}</span>
-          </div>
           {order.discount && (
             <>
+              <div className="row">
+                <span>{r.subtotal}</span>
+                <span>{amount(order.subtotal)}</span>
+              </div>
               <div className="row">
                 <span>{r.discount}</span>
                 <span>-{amount(order.discount.amount)}</span>

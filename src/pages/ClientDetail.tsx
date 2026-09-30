@@ -222,7 +222,16 @@ export default function ClientDetail() {
               )}
               {client.address && <Detail label={t.clients.address}>{client.address}</Detail>}
               <Detail label={t.clients.terms}>{fmt.terms(client.termsDays)}</Detail>
-              <Detail label={t.clients.usualDiscount}>{client.discount ? fmt.discount(client.discount) : t.clients.none}</Detail>
+              <Detail label={t.clients.usualDiscount}>
+                {data.discounts.length === 0
+                  ? t.clients.none
+                  : data.discounts.map((d) => (
+                      <span key={d.productId} className="block tabular">
+                        {t.clients.perCaseOff(d.name, fmt.money(d.perCase))}
+                      </span>
+                    ))}
+                <span className="block text-sm text-ink-3">{t.clients.usualDiscountHint}</span>
+              </Detail>
               <Detail label={t.clients.creditLimit}>
                 {client.creditLimit ? (
                   <>

@@ -2,12 +2,16 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { cleanText, fail, requireWholeNumber } from "./access";
 import { addDays, daysBetween } from "./dates";
-import { discountAmount, formatPeso, paymentStatusFor, type DiscountType } from "./money";
+import { discountAmount, formatPeso, lineAmount, paymentStatusFor } from "./money";
 import { availableStock, moveStock, openDay, recordEmpties } from "./stock";
 
 export type OrderItem = Doc<"orders">["items"][number];
-export type ItemInput = { productId: Id<"products">; quantity: number; emptiesReturned: number };
-export type DiscountInput = { type: DiscountType; value: number; note?: string };
+export type ItemInput = {
+  productId: Id<"products">;
+  quantity: number;
+  emptiesReturned: number;
+  discountPerCase?: number;
+};
 export type PaymentInput = {
   amount: number;
   method: Doc<"payments">["method"];
@@ -20,7 +24,6 @@ export type OrderInput = {
   completed?: boolean;
   deliveryAddress?: string;
   items: ItemInput[];
-  discount?: DiscountInput;
   notes?: string;
   payment?: PaymentInput;
 };
@@ -32,14 +35,16 @@ export async function buildItems(
   inputs: ItemInput[],
   existing: OrderItem[] = [],
 ): Promise<OrderItem[]> {
-  const merged = new Map<Id<"products">, { quantity: number; emptiesReturned: number }>();
+  const merged = new Map<Id<"products">, { quantity: number; emptiesReturned: number; discountPerCase: number }>();
   for (const input of inputs) {
     requireWholeNumber(input.quantity, ["Quantity", "dami"]);
     requireWholeNumber(input.emptiesReturned, ["Empties returned", "empties na ibinalik"]);
-    const line = merged.get(input.productId) ?? { quantity: 0, emptiesReturned: 0 };
+    requireWholeNumber(input.discountPerCase ?? 0, ["Discount", "discount"]);
+    const line = merged.get(input.productId) ?? { quantity: 0, emptiesReturned: 0, discountPerCase: 0 };
     merged.set(input.productId, {
       quantity: line.quantity + input.quantity,
       emptiesReturned: line.emptiesReturned + input.emptiesReturned,
+      discountPerCase: input.discountPerCase ?? line.discountPerCase,
     });
   }
 
@@ -50,14 +55,22 @@ export async function buildItems(
     const previous = existing.find((item) => item.productId === productId);
     const emptiesReturned = product.returnable ? line.emptiesReturned : 0;
     if (line.quantity === 0 && emptiesReturned === 0) continue;
+    const price = previous?.price ?? product.price;
+    if (line.discountPerCase > price) {
+      fail(
+        `The discount on ${product.name} is more than its price.`,
+        `Mas malaki ang discount sa ${product.name} kaysa sa presyo nito.`,
+      );
+    }
     items.push({
       productId,
       name: product.name,
-      price: previous?.price ?? product.price,
+      price,
       cost: previous?.cost ?? product.cost,
       quantity: line.quantity,
       returnable: product.returnable,
       emptiesReturned,
+      discountPerCase: line.discountPerCase > 0 ? line.discountPerCase : undefined,
     });
   }
   if (!items.some((item) => item.quantity > 0)) {
@@ -66,25 +79,17 @@ export async function buildItems(
   return items;
 }
 
-export function checkDiscount(discount: DiscountInput | undefined) {
-  if (!discount || discount.value === 0) return undefined;
-  if (discount.type === "percent") {
-    if (!(discount.value > 0 && discount.value <= 100)) {
-      fail("A percent discount must be between 0 and 100.", "Ang % na discount ay dapat mula 0 hanggang 100.");
-    }
-  } else {
-    requireWholeNumber(discount.value, ["Discount", "discount"]);
-  }
-  return { type: discount.type, value: discount.value, note: cleanText(discount.note) };
-}
+type OrderDiscount = NonNullable<Doc<"orders">["discount"]>;
 
-export function orderTotals(items: OrderItem[], discount: DiscountInput | undefined) {
-  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+// The whole-order discount only exists on older orders; it is recalculated
+// when one of them is edited.
+export function orderTotals(items: OrderItem[], oldDiscount?: OrderDiscount) {
+  const subtotal = items.reduce((sum, item) => sum + lineAmount(item), 0);
   const cases = items.reduce((sum, item) => sum + item.quantity, 0);
-  const amount = discountAmount(discount, subtotal, cases);
+  const amount = discountAmount(oldDiscount, subtotal, cases);
   return {
     subtotal,
-    discount: discount ? { ...discount, amount } : undefined,
+    discount: oldDiscount ? { ...oldDiscount, amount } : undefined,
     total: subtotal - amount,
   };
 }
@@ -217,7 +222,7 @@ export async function createOrder(ctx: MutationCtx, date: string, input: OrderIn
 
   const items = await buildItems(ctx, input.items);
   await assertStock(ctx, date, items, []);
-  const totals = orderTotals(items, checkDiscount(input.discount));
+  const totals = orderTotals(items);
   const orderId = await ctx.db.insert("orders", {
     orderNo: await nextOrderNo(ctx),
     date,
@@ -230,7 +235,6 @@ export async function createOrder(ctx: MutationCtx, date: string, input: OrderIn
         : undefined,
     items,
     subtotal: totals.subtotal,
-    discount: totals.discount,
     total: totals.total,
     amountPaid: 0,
     paymentStatus: paymentStatusFor(totals.total, 0),
@@ -252,12 +256,12 @@ export async function updateOrderItems(
   ctx: MutationCtx,
   order: Doc<"orders">,
   date: string,
-  input: { items: ItemInput[]; discount?: DiscountInput },
+  inputs: ItemInput[],
 ) {
   await openDay(ctx, date);
-  const items = await buildItems(ctx, input.items, order.items);
+  const items = await buildItems(ctx, inputs, order.items);
   await assertStock(ctx, date, items, order.items);
-  const totals = orderTotals(items, checkDiscount(input.discount));
+  const totals = orderTotals(items, order.discount);
   if (totals.total < order.amountPaid) {
     fail(
       `This order already has ${formatPeso(order.amountPaid)} in payments, which is more than the new total. Remove a payment first.`,
