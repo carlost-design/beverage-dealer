@@ -150,6 +150,7 @@ function OrderFlow({
   const createOrder = useMutation(api.orders.create);
   const updateItems = useMutation(api.orders.update);
   const updateDetails = useMutation(api.orders.updateDetails);
+  const settings = useQuery(api.settings.get);
   const order = existing?.order;
   const editing = Boolean(order);
 
@@ -176,6 +177,8 @@ function OrderFlow({
     ),
   );
   const [discountScope, setDiscountScope] = useState<"keep" | "once">("keep");
+  const [depositCases, setDepositCases] = useState(order?.depositCases ?? 0);
+  const [refundCases, setRefundCases] = useState(order?.refundCases ?? 0);
   const [notes, setNotes] = useState(order?.notes ?? "");
   const [noteOpen, setNoteOpen] = useState(Boolean(order?.notes));
   const [payMode, setPayMode] = useState<PayMode>("later");
@@ -206,7 +209,11 @@ function OrderFlow({
   // Older orders may carry a whole-order discount; it is kept when they are edited.
   const oldDiscount = order?.discount;
   const oldDiscountValue = discountAmount(oldDiscount, subtotal, cases);
-  const total = subtotal - oldDiscountValue;
+  // An order keeps the deposit price it was made with; new ones use Settings.
+  const depositPerCase = order?.depositPerCase ?? settings?.depositPerCase ?? 0;
+  const deposits = depositPerCase * depositCases;
+  const refunds = depositPerCase * refundCases;
+  const total = subtotal - oldDiscountValue + deposits - refunds;
   // Only new orders can change the client's usual discounts.
   const discountChanges = editing
     ? []
@@ -292,6 +299,7 @@ function OrderFlow({
       if (payMode === "part" && (paid === null || paid <= 0 || paid >= total)) return t.flow.partialAmount;
     }
     if (step === "review" && dayClosed) return t.flow.dayClosed;
+    if (step === "review" && total < 0) return t.flow.refundTooBig;
     return null;
   }
 
@@ -313,7 +321,7 @@ function OrderFlow({
     setSaving(true);
     try {
       if (order) {
-        await updateItems({ orderId: order._id, items });
+        await updateItems({ orderId: order._id, items, depositCases, refundCases });
         await updateDetails({ orderId: order._id, fulfillment, deliveryAddress: address, notes });
         toast.success(t.order.saved);
         navigate(`/orders/${order._id}`);
@@ -324,6 +332,8 @@ function OrderFlow({
           completed: fulfillment === "pickup" && takingNow,
           deliveryAddress: fulfillment === "delivery" ? address : undefined,
           items,
+          depositCases,
+          refundCases,
           saveDiscount,
           notes,
           payment: payMode !== "later" && paid ? { amount: paid, method, reference } : undefined,
@@ -601,17 +611,43 @@ function OrderFlow({
                 </li>
               ))}
           </ul>
-          {oldDiscount && oldDiscountValue > 0 && (
-            <dl className="space-y-2 border-t border-line px-5 py-4 text-lg sm:px-6">
-              <div className="flex justify-between gap-3">
-                <dt className="text-ink-3">{t.flow.subtotal}</dt>
-                <dd className="font-semibold tabular">{fmt.money(subtotal)}</dd>
-              </div>
+          <dl className="space-y-2 border-t border-line px-5 py-4 text-lg sm:px-6">
+            <div className="flex justify-between gap-3">
+              <dt className="text-ink-3">{t.flow.subtotal}</dt>
+              <dd className="font-semibold tabular">{fmt.money(subtotal)}</dd>
+            </div>
+            {oldDiscount && oldDiscountValue > 0 && (
               <div className="flex justify-between gap-3 text-[#146C43]">
                 <dt>{t.order.discount(fmt.discount(oldDiscount))}</dt>
                 <dd className="font-semibold tabular">−{fmt.money(oldDiscountValue)}</dd>
               </div>
-            </dl>
+            )}
+          </dl>
+          <div className="divide-y divide-line border-t border-line px-5 sm:px-6" data-tour="flow-deposit">
+            {depositPerCase > 0 ? (
+              <>
+                <CaseRow
+                  label={t.flow.deposit}
+                  hint={`${t.flow.depositHint} · ${t.flow.depositEach(fmt.money(depositPerCase))}`}
+                  value={depositCases}
+                  onChange={setDepositCases}
+                  amount={deposits > 0 ? `+${fmt.money(deposits)}` : undefined}
+                />
+                <CaseRow
+                  label={t.flow.refund}
+                  hint={`${t.flow.refundHint} · ${t.flow.depositEach(fmt.money(depositPerCase))}`}
+                  value={refundCases}
+                  onChange={setRefundCases}
+                  amount={refunds > 0 ? `−${fmt.money(refunds)}` : undefined}
+                  className="text-[#146C43]"
+                />
+              </>
+            ) : (
+              <p className="py-3.5 text-base text-ink-3">{t.flow.noDepositPrice}</p>
+            )}
+          </div>
+          {total < 0 && (
+            <p className="px-5 pb-3 text-base font-semibold text-[#B42318] sm:px-6">{t.flow.refundTooBig}</p>
           )}
           <div className="flex items-baseline justify-between gap-3 bg-brand-soft px-5 py-5 sm:px-6">
             <span className="text-xl font-bold text-ink">{t.flow.total}</span>
@@ -755,6 +791,34 @@ function ClientChoices({
         );
       })}
     </ul>
+  );
+}
+
+// A deposit or refund counter on the review step.
+function CaseRow({
+  label,
+  hint,
+  value,
+  onChange,
+  amount,
+  className,
+}: {
+  label: string;
+  hint: string;
+  value: number;
+  onChange: (value: number) => void;
+  amount?: string;
+  className?: string;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3.5">
+      <div className="w-full min-w-0 sm:w-auto sm:flex-1">
+        <p className="text-lg font-semibold text-ink">{label}</p>
+        <p className="text-base text-ink-3 tabular">{hint}</p>
+      </div>
+      <Stepper size="sm" value={value} onChange={onChange} label={label} />
+      <span className={cx("ml-auto text-right text-lg font-semibold tabular sm:w-28", className)}>{amount}</span>
+    </div>
   );
 }
 

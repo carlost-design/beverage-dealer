@@ -143,20 +143,45 @@ export default function OrderDetail() {
                 </li>
               ))}
             </ul>
-            {/* Whole-order discounts only exist on older orders. */}
-            {order.discount && (
+            {(order.discount || order.depositCases || order.refundCases) && (
               <dl className="space-y-2 border-t border-line px-5 py-4 text-lg sm:px-6">
                 <Row label={t.order.subtotal} value={fmt.money(order.subtotal)} />
-                <Row
-                  label={
-                    <>
-                      {t.order.discount(fmt.discount(order.discount))}
-                      {order.discount.note && <span className="block text-sm text-ink-3">{order.discount.note}</span>}
-                    </>
-                  }
-                  value={`−${fmt.money(order.discount.amount)}`}
-                  className="text-[#146C43]"
-                />
+                {/* Whole-order discounts only exist on older orders. */}
+                {order.discount && (
+                  <Row
+                    label={
+                      <>
+                        {t.order.discount(fmt.discount(order.discount))}
+                        {order.discount.note && <span className="block text-sm text-ink-3">{order.discount.note}</span>}
+                      </>
+                    }
+                    value={`−${fmt.money(order.discount.amount)}`}
+                    className="text-[#146C43]"
+                  />
+                )}
+                {order.depositCases && order.depositPerCase ? (
+                  <Row
+                    label={
+                      <>
+                        {t.flow.depositRow(order.depositCases)}
+                        <span className="block text-sm text-ink-3">{t.flow.depositEach(fmt.money(order.depositPerCase))}</span>
+                      </>
+                    }
+                    value={`+${fmt.money(order.depositCases * order.depositPerCase)}`}
+                  />
+                ) : null}
+                {order.refundCases && order.depositPerCase ? (
+                  <Row
+                    label={
+                      <>
+                        {t.flow.refundRow(order.refundCases)}
+                        <span className="block text-sm text-ink-3">{t.flow.depositEach(fmt.money(order.depositPerCase))}</span>
+                      </>
+                    }
+                    value={`−${fmt.money(order.refundCases * order.depositPerCase)}`}
+                    className="text-[#146C43]"
+                  />
+                ) : null}
               </dl>
             )}
             <div className="flex items-baseline justify-between gap-3 bg-brand-soft px-5 py-4 sm:px-6">

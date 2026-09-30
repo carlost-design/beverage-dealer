@@ -113,6 +113,7 @@ export const sampleData = internalMutation({
       receiptFooter: "Salamat po!\nThis is not an official receipt.",
       paperWidth: "58mm",
       receiptCopies: 1,
+      depositPerCase: 15000,
     });
 
     const firstDay = dateOf(DAYS - 1);

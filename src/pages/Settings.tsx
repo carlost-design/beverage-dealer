@@ -1,13 +1,27 @@
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
-import { Languages, LogOut, Printer, Type } from "lucide-react";
+import { Coins, Languages, LogOut, Printer, Type } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { api } from "../../convex/_generated/api";
 import { usePrint } from "../components/print";
 import { TestSlip } from "../components/receipts";
-import { Button, Card, CardHeader, ChoiceCards, Field, IconTile, Input, PageHeader, PageLoading, Segmented, Textarea } from "../components/ui";
+import {
+  Button,
+  Card,
+  CardHeader,
+  ChoiceCards,
+  Field,
+  IconTile,
+  Input,
+  PageHeader,
+  PageLoading,
+  PesoInput,
+  Segmented,
+  Textarea,
+} from "../components/ui";
 import { useErrorMessage, useFmt, useLang, useSetLanguage, useT, type Lang } from "../i18n";
+import { parsePeso, pesoInput } from "../lib/format";
 import { useTextSize, type TextSize } from "../lib/textSize";
 import { useTourPage } from "../tour/TourProvider";
 
@@ -23,6 +37,7 @@ export default function Settings() {
         <div className="space-y-5">
           <LanguageCard />
           <TextSizeCard />
+          <DepositCard key={settings.depositPerCase ?? 0} depositPerCase={settings.depositPerCase} />
           <Account />
         </div>
         <div className="space-y-5">
@@ -84,6 +99,49 @@ function TextSizeCard() {
         ]}
       />
       <p className="mt-4 rounded-xl bg-canvas px-4 py-3 text-lg text-ink">{t.settings.preview}</p>
+    </Card>
+  );
+}
+
+function DepositCard({ depositPerCase }: { depositPerCase?: number }) {
+  const t = useT();
+  const errorMessage = useErrorMessage();
+  const setDepositPrice = useMutation(api.settings.setDepositPrice);
+  const [value, setValue] = useState(pesoInput(depositPerCase));
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    const amount = value.trim() ? parsePeso(value) : 0;
+    if (amount === null) return toast.error(t.discount.checkAmount);
+    setSaving(true);
+    try {
+      await setDepositPrice({ depositPerCase: amount });
+      toast.success(t.settings.depositSaved);
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card className="p-5 sm:p-6" data-tour="settings-deposit">
+      <div className="mb-4 flex items-center gap-3">
+        <IconTile icon={Coins} tone="green" />
+        <div>
+          <h2 className="text-xl font-bold text-ink">{t.settings.depositTitle}</h2>
+          <p className="text-base text-ink-3">{t.settings.depositHint}</p>
+        </div>
+      </div>
+      <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3">
+        <Field label={t.settings.depositLabel} className="min-w-40 flex-1">
+          <PesoInput value={value} onChange={setValue} placeholder="0" />
+        </Field>
+        <Button type="submit" size="lg" loading={saving}>
+          {t.settings.depositSave}
+        </Button>
+      </form>
     </Card>
   );
 }

@@ -4,10 +4,15 @@ import { query, type QueryCtx } from "./_generated/server";
 import { currentUser } from "./lib/access";
 import { addDays } from "./lib/dates";
 import { dayView } from "./lib/dayView";
-import { lineAmount } from "./lib/money";
+import { depositNet, lineAmount } from "./lib/money";
 import { lateInfo, openOrders } from "./lib/orders";
 
 const PERIOD = 30;
+
+// Deposits and refunds are money for cases, not sales.
+function salesOf(order: Doc<"orders">) {
+  return order.total - depositNet(order);
+}
 
 function profitOf(order: Doc<"orders">) {
   const margin = order.items.reduce((sum, item) => sum + lineAmount(item) - item.cost * item.quantity, 0);
@@ -98,13 +103,13 @@ export const home = query({
       today: {
         orders: todays.length,
         cases: todays.reduce((sum, o) => sum + casesOf(o), 0),
-        sales: todays.reduce((sum, o) => sum + o.total, 0),
+        sales: todays.reduce((sum, o) => sum + salesOf(o), 0),
         collected: Object.values(collectedByMethod).reduce((sum, n) => sum + (n ?? 0), 0),
         collectedByMethod,
         toDeliver: todays.filter((o) => o.fulfillment === "delivery" && o.fulfillmentStatus !== "completed").length,
       },
       yesterday: {
-        sales: orders.filter((o) => o.date === yesterday).reduce((sum, o) => sum + o.total, 0),
+        sales: orders.filter((o) => o.date === yesterday).reduce((sum, o) => sum + salesOf(o), 0),
         collected: payments.filter((p) => p.date === yesterday).reduce((sum, p) => sum + p.amount, 0),
       },
       utang: { total, clients: list.length, late: late.reduce((sum, d) => sum + d.lateBalance, 0) },
@@ -142,7 +147,7 @@ export const reports = query({
     const previousPayments = payments.filter((p) => p.date <= prevEnd);
 
     const totals = (list: Doc<"orders">[], paid: Doc<"payments">[]) => ({
-      sales: list.reduce((sum, o) => sum + o.total, 0),
+      sales: list.reduce((sum, o) => sum + salesOf(o), 0),
       collected: paid.reduce((sum, p) => sum + p.amount, 0),
       profit: list.reduce((sum, o) => sum + profitOf(o), 0),
       cases: list.reduce((sum, o) => sum + casesOf(o), 0),
@@ -154,7 +159,7 @@ export const reports = query({
       const date = addDays(start, i);
       trend.push({
         date,
-        sales: current.filter((o) => o.date === date).reduce((sum, o) => sum + o.total, 0),
+        sales: current.filter((o) => o.date === date).reduce((sum, o) => sum + salesOf(o), 0),
         collected: currentPayments.filter((p) => p.date === date).reduce((sum, p) => sum + p.amount, 0),
       });
     }
@@ -163,7 +168,7 @@ export const reports = query({
     const weekdayTotals = Array.from({ length: 7 }, () => 0);
     const fourWeeks = addDays(today, -27);
     for (const order of current.filter((o) => o.date >= fourWeeks)) {
-      weekdayTotals[new Date(`${order.date}T00:00:00Z`).getUTCDay()] += order.total;
+      weekdayTotals[new Date(`${order.date}T00:00:00Z`).getUTCDay()] += salesOf(order);
     }
     const weekdays = weekdayTotals.map((sum, day) => ({ day, average: Math.round(sum / 4) }));
 
@@ -179,7 +184,7 @@ export const reports = query({
         productTotals.set(item.productId, entry);
       }
       const entry = clientTotals.get(order.clientId) ?? { sales: 0, orders: 0 };
-      entry.sales += order.total;
+      entry.sales += salesOf(order);
       entry.orders += 1;
       clientTotals.set(order.clientId, entry);
     }

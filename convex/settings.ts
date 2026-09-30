@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
-import { cleanText, currentUser, fail, logActivity, requireUser } from "./lib/access";
+import { cleanText, currentUser, fail, logActivity, requireUser, requireWholeNumber } from "./lib/access";
+import { formatPeso } from "./lib/money";
 
 type Settings = Omit<Doc<"settings">, "_id" | "_creationTime">;
 
@@ -53,6 +54,20 @@ export const update = mutation({
     if (saved) await ctx.db.patch("settings", saved._id, fields);
     else await ctx.db.insert("settings", fields);
     await logActivity(ctx, userId, "Updated settings", businessName);
+  },
+});
+
+// The deposit for each case a client keeps, used on new orders.
+export const setDepositPrice = mutation({
+  args: { depositPerCase: v.number() },
+  handler: async (ctx, { depositPerCase }) => {
+    const userId = await requireUser(ctx);
+    requireWholeNumber(depositPerCase, ["Deposit", "deposit"]);
+    const saved = await ctx.db.query("settings").first();
+    const value = depositPerCase > 0 ? depositPerCase : undefined;
+    if (saved) await ctx.db.patch("settings", saved._id, { depositPerCase: value });
+    else await ctx.db.insert("settings", { ...DEFAULT_SETTINGS, depositPerCase: value });
+    await logActivity(ctx, userId, "Changed deposit price", `${formatPeso(depositPerCase)} per case`);
   },
 });
 

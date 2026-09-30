@@ -24,6 +24,13 @@ export function lineAmount(item: { price: number; quantity: number; discountPerC
   return (item.price - (item.discountPerCase ?? 0)) * item.quantity;
 }
 
+type Deposits = { depositCases?: number; refundCases?: number; depositPerCase?: number };
+
+// Deposits minus refunds on an order. It is in the total but is not a sale.
+export function depositNet(order: Deposits): number {
+  return ((order.depositCases ?? 0) - (order.refundCases ?? 0)) * (order.depositPerCase ?? 0);
+}
+
 export function paymentStatusFor(total: number, paid: number): PaymentStatus {
   if (paid >= total) return "paid";
   return paid > 0 ? "partial" : "unpaid";

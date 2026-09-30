@@ -149,8 +149,8 @@ const SECTIONS: Section[] = [
         <B>May bayad na, kulang pa</B>. Kung may bayad, piliin ang Cash, GCash, Maya, bangko o tseke.
       </>,
       <>
-        <strong>Tingnan at i-save.</strong> Basahin ang mga binili at ang kabuuan. Kung tama lahat, pindutin ang berdeng{" "}
-        <B>I-save ang order</B>.
+        <strong>Tingnan at i-save.</strong> Basahin ang mga binili at ang kabuuan. Kung may deposit o refund ng kaha, ilagay
+        ang bilang sa ilalim ng <B>Subtotal</B>. Kung tama lahat, pindutin ang berdeng <B>I-save ang order</B>.
       </>,
       <>
         Lalabas ang <B>Na-save na po ang order!</B> Dito puwedeng pindutin ang <B>I-print ang resibo</B>,{" "}
@@ -162,6 +162,11 @@ const SECTIONS: Section[] = [
       <>
         May <B>Discount kada kaha</B> sa ilalim ng bawat produkto sa hakbang 2. Kusang nakalagay ang karaniwang discount ng
         suki. Kapag binago mo ito, itatanong sa hakbang 3 kung <B>Gamitin din sa susunod</B> o <B>Sa order na ito lang</B>.
+      </>,
+      <>
+        <B>Deposit</B>: ilang kaha ang hindi ibabalik at babayaran ng suki. Dagdag ito sa kabuuan. <B>Refund</B>: ilang kahang may
+        deposit ang ibinalik niya. Ibabalik ang deposit niya, kaya bawas ito sa kabuuan. Ang presyo ng deposit kada kaha ay
+        inilalagay sa <B>Settings</B>, sa <B>Deposit ng kaha</B>.
       </>,
       <>
         Magbababala ang app kapag late sa bayad ang suki, o kapag lalampas siya sa credit limit. Puwede pa ring ituloy ang order.
