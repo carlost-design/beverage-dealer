@@ -4,7 +4,7 @@ import { cleanText, currentUser, fail, logActivity, requireUser, requireWholeNum
 import { manilaDate } from "./lib/dates";
 import { formatPeso } from "./lib/money";
 import { moveStock, openDay, recordEmpties } from "./lib/stock";
-import { productCategory } from "./schema";
+import { productCategory, productSupplier } from "./schema";
 
 const productFields = v.object({
   name: v.string(),
@@ -13,6 +13,8 @@ const productFields = v.object({
   cost: v.number(),
   returnable: v.boolean(),
   lowStockLevel: v.number(),
+  supplier: v.optional(productSupplier),
+  emptyValue: v.optional(v.number()),
 });
 
 function cleanProduct(input: Infer<typeof productFields>) {
@@ -21,6 +23,7 @@ function cleanProduct(input: Infer<typeof productFields>) {
   requireWholeNumber(input.price, ["Price", "presyo"]);
   requireWholeNumber(input.cost, ["Cost", "puhunan"]);
   requireWholeNumber(input.lowStockLevel, ["Low stock level", "babala sa paubos na stock"]);
+  if (input.emptyValue !== undefined) requireWholeNumber(input.emptyValue, ["Empty case value", "halaga ng bakanteng kaha"]);
   return { ...input, name };
 }
 

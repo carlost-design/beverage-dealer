@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { api } from "../../convex/_generated/api";
 import type { Doc } from "../../convex/_generated/dataModel";
+import { supplierOf } from "../../convex/lib/suppliers";
 import { ProductTile } from "../components/ProductTile";
 import { Button, Card, Chip, EmptyState, Field, Input, Modal, PageHeader, PageLoading, PesoInput, Segmented, Stepper } from "../components/ui";
 import { useErrorMessage, useFmt, useT } from "../i18n";
@@ -89,6 +90,7 @@ export default function Products() {
                     <p className="truncate text-lg font-bold text-ink">{product.name}</p>
                     <p className="mt-1 flex flex-wrap gap-1.5">
                       <Chip tone="gray">{fmt.category(product.category)}</Chip>
+                      <Chip tone="violet">{t.suppliers.names[supplierOf(product)]}</Chip>
                       {product.returnable && <Chip tone="blue">{t.products.returnable}</Chip>}
                     </p>
                   </div>
@@ -157,10 +159,14 @@ function ProductModal({ product, onClose }: { product?: Doc<"products">; onClose
   const update = useMutation(api.products.update);
   const [name, setName] = useState(product?.name ?? "");
   const [category, setCategory] = useState<Category>(product?.category ?? "softdrinks");
+  // Unset follows the category until the owner picks one.
+  const [supplier, setSupplier] = useState(product?.supplier);
+  const shownSupplier = supplier ?? supplierOf({ category });
   const [price, setPrice] = useState(pesoInput(product?.price));
   const [cost, setCost] = useState(pesoInput(product?.cost));
   const [returnable, setReturnable] = useState(product?.returnable ?? true);
   const [lowStockLevel, setLowStockLevel] = useState(product?.lowStockLevel ?? 10);
+  const [emptyValue, setEmptyValue] = useState(pesoInput(product?.emptyValue));
   const [openingStock, setOpeningStock] = useState(0);
   const [openingEmpties, setOpeningEmpties] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -171,7 +177,11 @@ function ProductModal({ product, onClose }: { product?: Doc<"products">; onClose
     const costValue = parsePeso(cost);
     if (priceValue === null) return toast.error(t.products.needPrice);
     if (costValue === null) return toast.error(t.products.needCost);
-    const fields = { name, category, price: priceValue, cost: costValue, returnable, lowStockLevel };
+    // Blank means the supplier takes nothing off for empties. Sent as 0, not
+    // left out, so clearing a saved value really clears it.
+    const emptyValueAmount = returnable && emptyValue.trim() ? parsePeso(emptyValue) : 0;
+    if (emptyValueAmount === null) return toast.error(t.products.emptyValueError);
+    const fields = { name, category, price: priceValue, cost: costValue, returnable, lowStockLevel, supplier: shownSupplier, emptyValue: emptyValueAmount };
     setSaving(true);
     try {
       if (product) {
@@ -201,6 +211,13 @@ function ProductModal({ product, onClose }: { product?: Doc<"products">; onClose
             options={(["softdrinks", "beer", "other"] as const).map((c) => ({ value: c, label: fmt.category(c) }))}
           />
         </Field>
+        <Field label={t.suppliers.supplier} hint={t.suppliers.supplierHint}>
+          <Segmented
+            value={shownSupplier}
+            onChange={setSupplier}
+            options={(["coke", "sanMiguel", "other"] as const).map((key) => ({ value: key, label: t.suppliers.names[key] }))}
+          />
+        </Field>
         <div className="grid gap-5 sm:grid-cols-2">
           <Field label={t.products.pricePerCase}>
             <PesoInput value={price} onChange={setPrice} required />
@@ -217,6 +234,11 @@ function ProductModal({ product, onClose }: { product?: Doc<"products">; onClose
             <span className="block text-base text-ink-3">{t.products.returnableHint}</span>
           </span>
         </label>
+        {returnable && (
+          <Field label={t.products.emptyValue} hint={t.products.emptyValueHint}>
+            <PesoInput value={emptyValue} onChange={setEmptyValue} />
+          </Field>
+        )}
         <Field label={t.products.lowAlert} hint={t.products.lowAlertHint}>
           <Stepper value={lowStockLevel} onChange={setLowStockLevel} label={t.products.lowAlert} />
         </Field>
