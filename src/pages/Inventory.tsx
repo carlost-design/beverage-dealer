@@ -9,6 +9,7 @@ import {
   Printer,
   RotateCcw,
   ShoppingCart,
+  SlidersHorizontal,
   Truck,
 } from "lucide-react";
 import { useState, type FormEvent } from "react";
@@ -61,6 +62,8 @@ export default function Inventory() {
   const navigate = useNavigate();
   const [modal, setModal] = useState<"damage" | "empties" | "print" | "reopen" | null>(null);
   const [showAll, setShowAll] = useState(false);
+  // The product picked from a row, or "any" from the top button.
+  const [adjustFor, setAdjustFor] = useState<Id<"products"> | "any" | null>(null);
   const [showActivity, setShowActivity] = useState(false);
 
   if (!day || !products) return <PageLoading />;
@@ -116,6 +119,9 @@ export default function Inventory() {
                 </LinkButton>
                 <Button variant="secondary" size="lg" onClick={() => setModal("damage")} data-tour="stock-damaged">
                   <PackageMinus className="size-6" /> {t.stock.damaged}
+                </Button>
+                <Button variant="secondary" size="lg" onClick={() => setAdjustFor("any")}>
+                  <SlidersHorizontal className="size-6" /> {t.stock.adjust}
                 </Button>
                 <LinkButton to={`/inventory/close?date=${date}`} size="lg" data-tour="stock-close">
                   <ClipboardCheck className="size-6" /> {t.stock.countClose}
@@ -204,6 +210,11 @@ export default function Inventory() {
                   <th className="px-2 py-3 text-right font-semibold">{closed ? t.stock.systemShort : t.stock.nowShort}</th>
                   {closed && <th className="px-2 py-3 text-right font-semibold">{t.stock.countedShort}</th>}
                   {closed && <th className="px-3 py-3 text-right font-semibold">{t.stock.differenceShort}</th>}
+                  {editable && (
+                    <th className="px-3 py-3">
+                      <span className="sr-only">{t.stock.adjust}</span>
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-line tabular">
@@ -229,6 +240,11 @@ export default function Inventory() {
                         {row.variance === undefined ? "–" : row.variance === 0 ? "0" : `${row.variance > 0 ? "+" : "−"}${Math.abs(row.variance)}`}
                       </td>
                     )}
+                    {editable && (
+                      <td className="px-3 py-2 text-right">
+                        <AdjustButton name={row.name} onClick={() => setAdjustFor(row.productId)} />
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -240,7 +256,7 @@ export default function Inventory() {
               const low = row.active && row.lowStockLevel > 0 && row.expected <= row.lowStockLevel;
               const end = row.counted ?? row.expected;
               return (
-                <li key={row.productId} className="flex items-center gap-3 rounded-xl px-3 py-3">
+                <li key={row.productId} className="flex flex-wrap items-center gap-3 rounded-xl px-3 py-3">
                   <ProductTile category={row.category} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-lg font-semibold text-ink">{row.name}</p>
@@ -255,6 +271,8 @@ export default function Inventory() {
                     <p className={cx("text-2xl font-bold tabular", low && !closed ? "text-[#93370D]" : "text-ink")}>{end}</p>
                     <p className="text-sm text-ink-3">{t.stock.casesUnit}</p>
                   </div>
+                  {/* On phones the button takes its own line so the product name has room. */}
+                  {editable && <AdjustButton name={row.name} onClick={() => setAdjustFor(row.productId)} className="max-sm:w-full" />}
                 </li>
               );
             })}
@@ -337,6 +355,13 @@ export default function Inventory() {
       </div>
 
       {modal === "damage" && <DamageModal products={products.filter((p) => p.active)} rows={day.rows} onClose={() => setModal(null)} />}
+      {adjustFor && (
+        <AdjustStockModal
+          rows={day.rows}
+          productId={adjustFor === "any" ? undefined : adjustFor}
+          onClose={() => setAdjustFor(null)}
+        />
+      )}
       {modal === "empties" && <WarehouseEmptiesModal products={products.filter((p) => p.returnable && p.active)} onClose={() => setModal(null)} />}
       <PrintPreview
         open={modal === "print"}
@@ -408,6 +433,108 @@ function Activity({ date }: { date: string }) {
           ))}
       </ul>
     </Card>
+  );
+}
+
+function AdjustButton({ name, onClick, className }: { name: string; onClick: () => void; className?: string }) {
+  const t = useT();
+  return (
+    <Button variant="secondary" size="sm" onClick={onClick} aria-label={`${t.stock.adjust}: ${name}`} className={className}>
+      <SlidersHorizontal className="size-4" /> {t.stock.adjustRow}
+    </Button>
+  );
+}
+
+// A correction to the stock: type the real count, or add or remove cases.
+// Saved as an adjustment, shown in the Corrected column.
+function AdjustStockModal({
+  rows,
+  productId: initialProductId,
+  onClose,
+}: {
+  rows: { productId: Id<"products">; name: string; expected: number }[];
+  productId?: Id<"products">;
+  onClose: () => void;
+}) {
+  const t = useT();
+  const errorMessage = useErrorMessage();
+  const adjustStock = useMutation(api.inventory.adjustStock);
+  const stockOf = (id: string) => rows.find((r) => r.productId === id)?.expected ?? 0;
+  const [productId, setProductId] = useState<string>(initialProductId ?? rows[0]?.productId ?? "");
+  const [kind, setKind] = useState<"count" | "add" | "remove">("count");
+  const [count, setCount] = useState(() => stockOf(productId));
+  const [quantity, setQuantity] = useState(0);
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+  const inStock = stockOf(productId);
+  const delta = kind === "count" ? count - inStock : kind === "add" ? quantity : -quantity;
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (delta === 0) return toast.error(t.adjustStock.noChange);
+    if (!note.trim()) return toast.error(t.damage.needReason);
+    setSaving(true);
+    try {
+      await adjustStock({ productId: productId as Id<"products">, delta, note });
+      toast.success(t.damage.saved);
+      onClose();
+    } catch (err) {
+      toast.error(errorMessage(err));
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal open onClose={onClose} title={t.stock.adjust}>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <Field label={t.damage.product} hint={t.damage.inStockNow(inStock)}>
+          <Select
+            value={productId}
+            onChange={(e) => {
+              setProductId(e.target.value);
+              setCount(stockOf(e.target.value));
+            }}
+          >
+            {rows.map((r) => (
+              <option key={r.productId} value={r.productId}>
+                {r.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <ChoiceCards
+          label={t.stock.adjust}
+          value={kind}
+          onChange={setKind}
+          columns={3}
+          options={[
+            { value: "count", label: t.adjustStock.realCount },
+            { value: "add", label: t.adjustStock.add },
+            { value: "remove", label: t.adjustStock.remove },
+          ]}
+        />
+        {kind === "count" ? (
+          <Field label={t.adjustStock.countLabel} hint={t.adjustStock.difference(delta)}>
+            <Stepper value={count} onChange={setCount} label={t.adjustStock.countLabel} />
+          </Field>
+        ) : (
+          <Field label={t.damage.cases}>
+            <Stepper value={quantity} onChange={setQuantity} max={kind === "add" ? undefined : inStock} label={t.damage.cases} />
+          </Field>
+        )}
+        <Field label={t.common.reason} hint={t.damage.reasonHintOther}>
+          <Input value={note} onChange={(e) => setNote(e.target.value)} />
+        </Field>
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <Button variant="secondary" size="lg" onClick={onClose}>
+            {t.common.cancel}
+          </Button>
+          <Button type="submit" size="lg" loading={saving}>
+            {t.common.save}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 

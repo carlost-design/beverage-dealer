@@ -479,6 +479,8 @@ export const en = {
     noActivity: "No activity",
     deliveryArrived: "Delivery arrived",
     damaged: "Damaged or wrong count",
+    adjust: "Adjust stock",
+    adjustRow: "Adjust",
     countClose: "Count & close the day",
     reopen: "Open the day again",
     printReport: "Print report",
@@ -569,6 +571,15 @@ export const en = {
     reasonHintOther: "Required, for example: recounted the storage",
     needReason: "Enter a reason.",
     saved: "Stock updated",
+  },
+  adjustStock: {
+    realCount: "Type the real count",
+    add: "Add cases",
+    remove: "Remove cases",
+    countLabel: "Full cases in storage now",
+    difference: (n: number) =>
+      n === 0 ? "Same as the system. Nothing to change." : `${n > 0 ? "+" : "−"}${plural(Math.abs(n), "case", "cases")} will show as corrected`,
+    noChange: "Nothing to change. Enter a different number.",
   },
   warehouseEmpties: {
     title: "Correct empty cases in storage",
@@ -1261,6 +1272,8 @@ export const fil: Strings = {
     noActivity: "Walang nangyari",
     deliveryArrived: "Dumating ang delivery",
     damaged: "Sira o maling bilang",
+    adjust: "Ayusin ang stock",
+    adjustRow: "Ayusin",
     countClose: "Bilangin at isara ang araw",
     reopen: "Buksan ulit ang araw",
     printReport: "I-print ang ulat",
@@ -1351,6 +1364,15 @@ export const fil: Strings = {
     reasonHintOther: "Kailangan, hal. binilang ulit ang bodega",
     needReason: "Ilagay ang dahilan.",
     saved: "Na-update ang stock",
+  },
+  adjustStock: {
+    realCount: "Ilagay ang totoong bilang",
+    add: "Dagdagan ng kaha",
+    remove: "Bawasan ng kaha",
+    countLabel: "Ilang punong kaha ang nasa bodega ngayon",
+    difference: (n: number) =>
+      n === 0 ? "Pareho sa system. Walang babaguhin." : `${n > 0 ? "+" : "−"}${num(Math.abs(n))} kaha ang lalabas sa Itinama`,
+    noChange: "Walang babaguhin. Maglagay ng ibang bilang.",
   },
   warehouseEmpties: {
     title: "Itama ang bakanteng kaha sa bodega",
