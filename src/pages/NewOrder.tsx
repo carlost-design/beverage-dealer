@@ -194,7 +194,10 @@ function OrderFlow({
   const stockByProduct = useMemo(() => new Map(stockRows.map((row) => [row.productId, row])), [stockRows]);
   const onOrder = (productId: string) => order?.items.find((i) => i.productId === productId)?.quantity ?? 0;
   const available = (productId: Id<"products">) => (stockByProduct.get(productId)?.expected ?? 0) + onOrder(productId);
-  const priceOf = (product: Doc<"products">) => order?.items.find((i) => i.productId === product._id)?.price ?? product.price;
+  const priceOf = (product: Doc<"products">) =>
+    order?.items.find((i) => i.productId === product._id)?.price ??
+    client?.productPrices?.find((p) => p.productId === product._id)?.price ??
+    product.price;
 
   const chosen = products
     .map((product) => ({ product, line: lines[product._id] }))

@@ -3,6 +3,7 @@ import type { Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import { cleanText, currentUser, fail, logActivity, requireUser, requireWholeNumber } from "./lib/access";
 import { manilaDate } from "./lib/dates";
+import { formatPeso } from "./lib/money";
 import { lateInfo, openOrders, openOrdersForClient } from "./lib/orders";
 import { recordEmpties } from "./lib/stock";
 
@@ -195,6 +196,38 @@ export const setActive = mutation({
     if (!client) fail("Client not found.", "Hindi makita ang suki.");
     await ctx.db.patch("clients", clientId, { active });
     await logActivity(ctx, userId, active ? "Restored client" : "Archived client", client.name);
+  },
+});
+
+// The client's own price per case. A price equal to the Products page price
+// is not kept, so that product follows the Products page again.
+export const setPrices = mutation({
+  args: {
+    clientId: v.id("clients"),
+    prices: v.array(v.object({ productId: v.id("products"), price: v.number() })),
+  },
+  handler: async (ctx, { clientId, prices }) => {
+    const userId = await requireUser(ctx);
+    const client = await ctx.db.get("clients", clientId);
+    if (!client) fail("Client not found.", "Hindi makita ang suki.");
+    const own = new Map((client.productPrices ?? []).map((p) => [p.productId, p.price]));
+    const changes = [];
+    for (const { productId, price } of prices) {
+      requireWholeNumber(price, ["Price", "presyo"]);
+      const product = await ctx.db.get("products", productId);
+      if (!product) fail("Product not found.", "Hindi makita ang produkto.");
+      const before = own.get(productId) ?? product.price;
+      if (price === product.price) own.delete(productId);
+      else own.set(productId, price);
+      if (before !== price) changes.push(`${product.name} ${formatPeso(before)} → ${formatPeso(price)}`);
+    }
+    // Saved even when no price changed, so a price that now matches the
+    // Products page stops being kept for this client.
+    await ctx.db.patch("clients", clientId, {
+      productPrices: [...own].map(([productId, price]) => ({ productId, price })),
+    });
+    if (changes.length === 0) return;
+    await logActivity(ctx, userId, "Changed client prices", `${client.name}: ${changes.join(", ")} per case`);
   },
 });
 
