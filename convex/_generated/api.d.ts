@@ -20,11 +20,13 @@ import type * as lib_labels from "../lib/labels.js";
 import type * as lib_money from "../lib/money.js";
 import type * as lib_orders from "../lib/orders.js";
 import type * as lib_stock from "../lib/stock.js";
+import type * as lib_suppliers from "../lib/suppliers.js";
 import type * as orders from "../orders.js";
 import type * as payments from "../payments.js";
 import type * as products from "../products.js";
 import type * as seed from "../seed.js";
 import type * as settings from "../settings.js";
+import type * as suppliers from "../suppliers.js";
 import type * as users from "../users.js";
 
 import type {
@@ -46,11 +48,13 @@ declare const fullApi: ApiFromModules<{
   "lib/money": typeof lib_money;
   "lib/orders": typeof lib_orders;
   "lib/stock": typeof lib_stock;
+  "lib/suppliers": typeof lib_suppliers;
   orders: typeof orders;
   payments: typeof payments;
   products: typeof products;
   seed: typeof seed;
   settings: typeof settings;
+  suppliers: typeof suppliers;
   users: typeof users;
 }>;
 

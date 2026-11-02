@@ -18,6 +18,7 @@ import Products from "./pages/Products";
 import ReceivePayment from "./pages/ReceivePayment";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
+import SupplierTracking from "./pages/SupplierTracking";
 import { TourProvider } from "./tour/TourProvider";
 
 export default function App() {
@@ -44,6 +45,8 @@ export default function App() {
             <Route path="orders/:orderId/edit" element={<NewOrder />} />
             <Route path="payments/new" element={<ReceivePayment />} />
             <Route path="inventory" element={<Inventory />} />
+            <Route path="suppliers/coke" element={<SupplierTracking key="coke" supplier="coke" />} />
+            <Route path="suppliers/san-miguel" element={<SupplierTracking key="sanMiguel" supplier="sanMiguel" />} />
             <Route path="inventory/close" element={<CloseDay />} />
             <Route path="inventory/delivery" element={<DeliveryArrived />} />
             <Route path="clients" element={<Clients />} />

@@ -1,9 +1,9 @@
 import { v } from "convex/values";
-import type { Doc, Id } from "./_generated/dataModel";
+import type { Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import { cleanText, currentUser, fail, logActivity, requireUser, requireWholeNumber } from "./lib/access";
 import { manilaDate } from "./lib/dates";
-import { depositNet, formatPeso } from "./lib/money";
+import { depositNet } from "./lib/money";
 import { dayView } from "./lib/dayView";
 import {
   availableStock,
@@ -13,6 +13,7 @@ import {
   moveStock,
   openDay,
   recordEmpties,
+  recordStockIn,
   stockRow,
 } from "./lib/stock";
 
@@ -127,73 +128,7 @@ export const stockIn = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await requireUser(ctx);
-    const date = manilaDate();
-    await openDay(ctx, date);
-
-    const items: Doc<"stockIns">["items"] = [];
-    for (const item of args.items) {
-      requireWholeNumber(item.quantity, ["Cases received", "kahang dumating"]);
-      if (item.quantity === 0) continue;
-      const product = await ctx.db.get("products", item.productId);
-      if (!product) fail("Product not found.", "Hindi makita ang produkto.");
-      const cost = item.cost ?? product.cost;
-      requireWholeNumber(cost, ["Cost", "puhunan"]);
-      items.push({ productId: product._id, name: product.name, quantity: item.quantity, cost });
-    }
-    const empties: Doc<"stockIns">["emptiesReturned"] = [];
-    for (const item of args.emptiesReturned) {
-      requireWholeNumber(item.quantity, ["Empties returned", "empties na ibinalik"]);
-      if (item.quantity === 0) continue;
-      const product = await ctx.db.get("products", item.productId);
-      if (!product?.returnable) fail("Only returnable products have empties.", "Ang mga produktong may ibinabalik na kaha lang ang may empties.");
-      empties.push({ productId: product._id, name: product.name, quantity: item.quantity });
-    }
-    if (items.length === 0 && empties.length === 0) {
-      fail("Enter the cases received or the empties returned.", "Ilagay ang kahang dumating o ang empties na ibinalik.");
-    }
-
-    const supplier = cleanText(args.supplier);
-    const totalCost = items.reduce((sum, item) => sum + item.cost * item.quantity, 0);
-    const stockInId = await ctx.db.insert("stockIns", {
-      date,
-      supplier,
-      reference: cleanText(args.reference),
-      items,
-      emptiesReturned: empties,
-      totalCost,
-      note: cleanText(args.note),
-    });
-    const note = supplier ? `From ${supplier}` : "Stock in";
-    for (const item of items) {
-      await moveStock(ctx, {
-        date,
-        productId: item.productId,
-        field: "stockIn",
-        quantity: item.quantity,
-        type: "stock_in",
-        stockInId,
-        note,
-      });
-    }
-    for (const item of empties) {
-      await recordEmpties(ctx, {
-        date,
-        productId: item.productId,
-        type: "to_supplier",
-        quantity: item.quantity,
-        stockInId,
-        note: supplier ? `To ${supplier}` : "To supplier",
-      });
-    }
-    const cases = items.reduce((sum, item) => sum + item.quantity, 0);
-    await logActivity(
-      ctx,
-      userId,
-      "Stock in",
-      `${cases} cases${supplier ? ` from ${supplier}` : ""} (${formatPeso(totalCost)})${
-        empties.length ? `, ${empties.reduce((s, e) => s + e.quantity, 0)} empty cases returned` : ""
-      }`,
-    );
+    await recordStockIn(ctx, userId, args);
   },
 });
 

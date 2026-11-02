@@ -28,6 +28,12 @@ export const productCategory = v.union(
   v.literal("other"),
 );
 
+// The two suppliers with their own tracking tab. Other products aren't in either.
+export const supplierKey = v.union(v.literal("coke"), v.literal("sanMiguel"));
+export const productSupplier = v.union(v.literal("coke"), v.literal("sanMiguel"), v.literal("other"));
+
+export const checkStatus = v.union(v.literal("pending"), v.literal("cleared"), v.literal("bounced"));
+
 export const stockMovementType = v.union(
   v.literal("stock_in"),
   v.literal("sale"),
@@ -70,6 +76,9 @@ export default defineSchema({
     lowStockLevel: v.number(), // 0 turns the alert off
     emptiesOnHand: v.number(),
     active: v.boolean(),
+    // Which tracking tab it belongs to. Missing: from the category (see lib/suppliers).
+    supplier: v.optional(productSupplier),
+    emptyValue: v.optional(v.number()), // what the supplier takes off for each empty case returned
   }),
 
   clients: defineTable({
@@ -235,6 +244,47 @@ export default defineSchema({
   })
     .index("by_client", ["clientId"])
     .index("by_date", ["date"]),
+
+  // A purchase from Coke or San Miguel: full goods − empties = total.
+  supplierPurchases: defineTable({
+    supplier: supplierKey,
+    date: v.string(),
+    reference: v.optional(v.string()), // invoice or delivery receipt number
+    items: v.array(
+      v.object({
+        productId: v.id("products"),
+        name: v.string(),
+        quantity: v.number(), // full cases bought
+        cost: v.number(), // full-goods price per case
+        emptiesReturned: v.number(),
+        emptyValue: v.number(), // taken off for each empty case
+      }),
+    ),
+    cases: v.number(),
+    empties: v.number(),
+    fullGoods: v.number(), // full cases × cost
+    emptiesAmount: v.number(), // empties × empty value
+    total: v.number(), // fullGoods − emptiesAmount
+    note: v.optional(v.string()),
+    stockInId: v.optional(v.id("stockIns")), // set once the cases were added to stock
+  })
+    .index("by_supplier_date", ["supplier", "date"])
+    .index("by_supplier_stock", ["supplier", "stockInId"]),
+
+  // Checks given to a supplier (San Miguel), with the date on the check and
+  // the date the payment is due.
+  supplierChecks: defineTable({
+    supplier: supplierKey,
+    checkNo: v.string(),
+    bank: v.optional(v.string()),
+    amount: v.number(),
+    checkDate: v.string(),
+    dueDate: v.string(),
+    status: checkStatus,
+    note: v.optional(v.string()),
+  })
+    .index("by_supplier_due", ["supplier", "dueDate"])
+    .index("by_status", ["status", "supplier"]),
 
   counters: defineTable({
     name: v.string(),

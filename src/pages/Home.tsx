@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ClipboardCheck,
   HandCoins,
+  Landmark,
   PackageOpen,
   Plus,
   ReceiptText,
@@ -36,6 +37,7 @@ import {
 import { useFmt, useT } from "../i18n";
 import { cx, manilaHour } from "../lib/format";
 import { useToday } from "../lib/useToday";
+import { CheckWarningChip } from "./SupplierTracking";
 import { markWelcomeDone, readWelcomeDone, useTour, useTourPage } from "../tour/TourProvider";
 
 export default function Home() {
@@ -45,6 +47,7 @@ export default function Home() {
   const today = useToday();
   const data = useQuery(api.dashboard.home, { today });
   const settings = useQuery(api.settings.get);
+  const checks = useQuery(api.suppliers.checkWarnings, { today });
 
   if (!data || !settings) return <PageLoading />;
   const hour = manilaHour();
@@ -83,6 +86,29 @@ export default function Home() {
             }
           >
             {t.home.notClosedHint}
+          </Alert>
+        )}
+        {checks && checks.length > 0 && (
+          <Alert
+            tone={checks.some((check) => check.warning?.kind !== "dueSoon") ? "red" : "amber"}
+            icon={Landmark}
+            title={t.suppliers.homeTitle(checks.length)}
+            action={
+              <LinkButton to="/suppliers/san-miguel" variant="secondary">
+                {t.suppliers.seeChecks}
+              </LinkButton>
+            }
+          >
+            <ul className="mt-1 space-y-1.5">
+              {checks.map((check) => (
+                <li key={check._id} className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold tabular">
+                    #{check.checkNo} · {fmt.money(check.amount)} · {t.suppliers.due(fmt.shortDate(check.dueDate))}
+                  </span>
+                  {check.warning && <CheckWarningChip warning={check.warning} />}
+                </li>
+              ))}
+            </ul>
           </Alert>
         )}
         {data.stock.status === "closed" && (

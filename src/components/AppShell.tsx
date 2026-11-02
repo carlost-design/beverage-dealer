@@ -3,11 +3,13 @@ import { useQuery } from "convex/react";
 import {
   AlertTriangle,
   BarChart3,
+  Beer,
   Bell,
   BookOpen,
   Boxes,
   CircleHelp,
   ClipboardCheck,
+  CupSoda,
   Home,
   LogOut,
   Package,
@@ -70,6 +72,8 @@ export default function AppShell() {
       badge: alerts && alerts.lateCount > 0 ? <Chip tone="red" solid>{alerts.lateCount}</Chip> : null,
     },
     { to: "/inventory", label: t.nav.stock, icon: Boxes },
+    { to: "/suppliers/coke", label: t.nav.coke, icon: CupSoda },
+    { to: "/suppliers/san-miguel", label: t.nav.sanMiguel, icon: Beer },
     { to: "/reports", label: t.nav.reports, icon: BarChart3 },
     { to: "/products", label: t.nav.products, icon: Package },
   ];
@@ -515,6 +519,8 @@ function AccountMenu() {
   const { open, setOpen, ref } = usePopover();
   const email = me?.email ?? "";
   const items = [
+    { to: "/suppliers/coke", label: t.nav.coke, icon: CupSoda, mobileOnly: true },
+    { to: "/suppliers/san-miguel", label: t.nav.sanMiguel, icon: Beer, mobileOnly: true },
     { to: "/reports", label: t.nav.reports, icon: BarChart3, mobileOnly: true },
     { to: "/products", label: t.nav.products, icon: Package, mobileOnly: true },
     { to: "/settings", label: t.nav.settings, icon: Settings, mobileOnly: false },
