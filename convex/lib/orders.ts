@@ -57,12 +57,14 @@ export async function buildDeposits(ctx: QueryCtx, input: DepositInput, existing
 type Deposits = Awaited<ReturnType<typeof buildDeposits>>;
 
 // Merges duplicate lines and snapshots prices. Lines already on the order keep
-// the price they were sold at.
+// the price they were sold at; new lines use the client's own price, if set.
 export async function buildItems(
   ctx: QueryCtx,
   inputs: ItemInput[],
+  clientPrices: Doc<"clients">["productPrices"],
   existing: OrderItem[] = [],
 ): Promise<OrderItem[]> {
+  const ownPrice = new Map((clientPrices ?? []).map((p) => [p.productId, p.price]));
   const merged = new Map<Id<"products">, { quantity: number; emptiesReturned: number; discountPerCase: number }>();
   for (const input of inputs) {
     requireWholeNumber(input.quantity, ["Quantity", "dami"]);
@@ -83,7 +85,7 @@ export async function buildItems(
     const previous = existing.find((item) => item.productId === productId);
     const emptiesReturned = product.returnable ? line.emptiesReturned : 0;
     if (line.quantity === 0 && emptiesReturned === 0) continue;
-    const price = previous?.price ?? product.price;
+    const price = previous?.price ?? ownPrice.get(productId) ?? product.price;
     if (line.discountPerCase > price) {
       fail(
         `The discount on ${product.name} is more than its price.`,
@@ -255,7 +257,7 @@ export async function createOrder(ctx: MutationCtx, date: string, input: OrderIn
   if (!client || !client.active) fail("Choose an active client.", "Pumili ng suki.");
   await openDay(ctx, date);
 
-  const items = await buildItems(ctx, input.items);
+  const items = await buildItems(ctx, input.items, client.productPrices);
   await assertStock(ctx, date, items, []);
   const deposits = await buildDeposits(ctx, input);
   const totals = orderTotals(items, deposits);
@@ -297,7 +299,8 @@ export async function updateOrderItems(
   depositInput: DepositInput,
 ) {
   await openDay(ctx, date);
-  const items = await buildItems(ctx, inputs, order.items);
+  const client = await ctx.db.get("clients", order.clientId);
+  const items = await buildItems(ctx, inputs, client?.productPrices, order.items);
   await assertStock(ctx, date, items, order.items);
   const deposits = await buildDeposits(ctx, depositInput, order);
   const totals = orderTotals(items, deposits, order.discount);

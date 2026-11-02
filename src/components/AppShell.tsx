@@ -21,7 +21,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Component, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { api } from "../../convex/_generated/api";
 import { useFmt, useLang, useSetLanguage, useT, type Lang } from "../i18n";
@@ -30,7 +30,7 @@ import { cx } from "../lib/format";
 import { useTextSize, type TextSize } from "../lib/textSize";
 import { useToday } from "../lib/useToday";
 import { LogoMark } from "./Logo";
-import { Avatar, Chip, SearchField } from "./ui";
+import { Alert, Avatar, Button, Chip, SearchField } from "./ui";
 
 type Alerts = NonNullable<ReturnType<typeof useAlerts>>;
 
@@ -143,7 +143,9 @@ export default function AppShell() {
 
       <main className="px-4 pt-6 pb-36 sm:px-6 lg:ml-72 lg:px-8 lg:pt-8 lg:pb-16">
         <div className="mx-auto max-w-7xl">
-          <Outlet />
+          <ScreenErrorBoundary key={location.pathname}>
+            <Outlet />
+          </ScreenErrorBoundary>
         </div>
       </main>
 
@@ -616,5 +618,32 @@ function GlobalSearch({ autoFocus }: { autoFocus?: boolean }) {
         </div>
       )}
     </div>
+  );
+}
+
+// A screen that crashes shows a message instead of a blank white page.
+// Keyed by the path, so moving to another screen clears it.
+class ScreenErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    return this.state.failed ? <ScreenError /> : this.props.children;
+  }
+}
+
+function ScreenError() {
+  const t = useT();
+  return (
+    <Alert
+      tone="red"
+      title={t.common.crashTitle}
+      action={<Button onClick={() => window.location.reload()}>{t.common.reload}</Button>}
+    >
+      {t.common.crashHint}
+    </Alert>
   );
 }

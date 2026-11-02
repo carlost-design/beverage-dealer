@@ -83,6 +83,8 @@ export default defineSchema({
     discount: v.optional(discountRule),
     // Usual discount per case for each product, filled in on new orders.
     productDiscounts: v.optional(v.array(v.object({ productId: v.id("products"), perCase: v.number() }))),
+    // This client's own price per case. Products not listed use the price on the Products page.
+    productPrices: v.optional(v.array(v.object({ productId: v.id("products"), price: v.number() }))),
     notes: v.optional(v.string()),
     active: v.boolean(),
   }),

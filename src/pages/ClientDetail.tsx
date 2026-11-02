@@ -1,10 +1,10 @@
 import { useMutation, useQuery } from "convex/react";
-import { AlertTriangle, Archive, ArchiveRestore, HandCoins, Package, Pencil, Phone, Plus, Printer, Wallet } from "lucide-react";
+import { AlertTriangle, Archive, ArchiveRestore, HandCoins, Package, Pencil, Phone, Plus, Printer, Tag, Wallet } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router";
 import { toast } from "sonner";
 import { api } from "../../convex/_generated/api";
-import type { Id } from "../../convex/_generated/dataModel";
+import type { Doc, Id } from "../../convex/_generated/dataModel";
 import { ClientFormModal } from "../components/ClientFormModal";
 import { PrintPreview } from "../components/print";
 import { StatementSlip } from "../components/receipts";
@@ -23,12 +23,13 @@ import {
   LinkButton,
   Modal,
   PageLoading,
+  PesoInput,
   Select,
   StatCard,
   Stepper,
 } from "../components/ui";
 import { useErrorMessage, useFmt, useT } from "../i18n";
-import { cx } from "../lib/format";
+import { cx, parsePeso, pesoInput } from "../lib/format";
 import { useToday } from "../lib/useToday";
 import { useTourPage } from "../tour/TourProvider";
 
@@ -46,6 +47,7 @@ export default function ClientDetail() {
   const [printing, setPrinting] = useState(false);
   const [returning, setReturning] = useState(false);
   const [adjusting, setAdjusting] = useState(false);
+  const [pricing, setPricing] = useState(false);
 
   if (data === undefined || !products) return <PageLoading />;
   if (data === null) {
@@ -54,6 +56,8 @@ export default function ClientDetail() {
   const { client } = data;
   const isLate = data.daysLate > 0;
   const returnable = products.filter((p) => p.returnable && p.active);
+  const priced = products.filter((p) => p.active);
+  const ownPrice = new Map((client.productPrices ?? []).map((p) => [p.productId, p.price]));
   const creditUse = client.creditLimit ? Math.min(1, data.balance / client.creditLimit) : 0;
 
   async function toggleArchive() {
@@ -223,7 +227,7 @@ export default function ClientDetail() {
               {client.address && <Detail label={t.clients.address}>{client.address}</Detail>}
               <Detail label={t.clients.terms}>{fmt.terms(client.termsDays)}</Detail>
               <Detail label={t.clients.usualDiscount}>
-                {data.discounts.length === 0
+                {!data.discounts?.length
                   ? t.clients.none
                   : data.discounts.map((d) => (
                       <span key={d.productId} className="block tabular">
@@ -250,6 +254,40 @@ export default function ClientDetail() {
               </Detail>
               {client.notes && <Detail label={t.clients.notes}>{client.notes}</Detail>}
             </dl>
+          </Card>
+
+          <Card>
+            <CardHeader
+              title={t.clients.pricesTitle}
+              description={t.clients.pricesHint}
+              action={
+                priced.length > 0 ? (
+                  <Button variant="secondary" size="sm" onClick={() => setPricing(true)}>
+                    <Tag className="size-4" /> {t.clients.editPrices}
+                  </Button>
+                ) : undefined
+              }
+            />
+            {priced.length === 0 ? (
+              <p className="px-6 pb-4 text-base text-ink-3">{t.clients.noPriceProducts}</p>
+            ) : (
+              <ul className="divide-y divide-line px-5 pb-2 sm:px-6">
+                {priced.map((product) => {
+                  const own = ownPrice.get(product._id);
+                  return (
+                    <li key={product._id} className="flex justify-between gap-3 py-2.5 text-base">
+                      <span className="text-ink-2">{product.name}</span>
+                      <span className="text-right">
+                        <span className="block font-bold tabular">{fmt.money(own ?? product.price)}</span>
+                        {own !== undefined && (
+                          <span className="block text-sm text-ink-3 tabular">{t.clients.defaultPrice(fmt.money(product.price))}</span>
+                        )}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </Card>
 
           <Card data-tour="client-empties">
@@ -314,6 +352,7 @@ export default function ClientDetail() {
           onClose={() => setReturning(false)}
         />
       )}
+      {pricing && <PricesModal client={client} products={priced} onClose={() => setPricing(false)} />}
       {adjusting && <AdjustEmptiesModal clientId={client._id} products={returnable} onClose={() => setAdjusting(false)} />}
     </>
   );
@@ -450,6 +489,69 @@ function AdjustEmptiesModal({
         <Field label={t.common.reason} hint={t.clients.adjustReasonHint}>
           <Input value={note} onChange={(e) => setNote(e.target.value)} />
         </Field>
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <Button variant="secondary" size="lg" onClick={onClose}>
+            {t.common.cancel}
+          </Button>
+          <Button type="submit" size="lg" loading={saving}>
+            {t.common.save}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function PricesModal({
+  client,
+  products,
+  onClose,
+}: {
+  client: Doc<"clients">;
+  products: Doc<"products">[];
+  onClose: () => void;
+}) {
+  const t = useT();
+  const fmt = useFmt();
+  const errorMessage = useErrorMessage();
+  const setPrices = useMutation(api.clients.setPrices);
+  const [prices, setPricesInput] = useState<Record<string, string>>(() => {
+    const own = new Map((client.productPrices ?? []).map((p) => [p.productId, p.price]));
+    return Object.fromEntries(products.map((p) => [p._id, pesoInput(own.get(p._id) ?? p.price)]));
+  });
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    const items = [];
+    for (const product of products) {
+      const price = parsePeso(prices[product._id] ?? "");
+      if (price === null) return toast.error(t.clients.checkPrice(product.name));
+      items.push({ productId: product._id, price });
+    }
+    setSaving(true);
+    try {
+      await setPrices({ clientId: client._id, prices: items });
+      toast.success(t.clients.pricesSaved);
+      onClose();
+    } catch (err) {
+      toast.error(errorMessage(err));
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal open onClose={onClose} title={t.clients.pricesFormTitle(client.name)} description={t.clients.pricesHint}>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {products.map((product) => (
+          <Field key={product._id} label={product.name} hint={t.clients.defaultPrice(fmt.money(product.price))}>
+            <PesoInput
+              value={prices[product._id] ?? ""}
+              onChange={(value) => setPricesInput((p) => ({ ...p, [product._id]: value }))}
+              required
+            />
+          </Field>
+        ))}
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button variant="secondary" size="lg" onClick={onClose}>
             {t.common.cancel}
