@@ -24,7 +24,7 @@ import { toast } from "sonner";
 import { api } from "../../convex/_generated/api";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
 import type { StockRow } from "../../convex/lib/dayView";
-import { discountAmount } from "../../convex/lib/money";
+import { discountAmount, lineAmount } from "../../convex/lib/money";
 import { ClientFormModal } from "../components/ClientFormModal";
 import { PrintPreview } from "../components/print";
 import { ProductTile } from "../components/ProductTile";
@@ -50,6 +50,7 @@ import {
 } from "../components/ui";
 import { useErrorMessage, useFmt, useT } from "../i18n";
 import { cx, parsePeso, pesoInput } from "../lib/format";
+import { productSections } from "../lib/productGroups";
 import { addDays, useToday } from "../lib/useToday";
 import { useTourPage } from "../tour/TourProvider";
 
@@ -74,11 +75,12 @@ export default function NewOrder() {
   const [round, setRound] = useState(0);
   const today = useToday();
   const products = useQuery(api.products.list);
+  const groups = useQuery(api.productGroups.list);
   const clients = useClientList(today);
   const stock = useQuery(api.inventory.day, { date: today });
   const existing = useOrder(orderId, today);
 
-  if (!products || !clients || !stock || (orderId && existing === undefined)) return <PageLoading />;
+  if (!products || !groups || !clients || !stock || (orderId && existing === undefined)) return <PageLoading />;
   if (orderId && !existing) {
     return <EmptyState title={t.order.notFound} action={<LinkButton to="/orders">{t.order.backToOrders}</LinkButton>} />;
   }
@@ -102,6 +104,7 @@ export default function NewOrder() {
       }}
       today={today}
       products={products.filter((p) => p.active || existing?.order.items.some((i) => i.productId === p._id))}
+      groups={groups}
       clients={clients}
       stockRows={stock.rows}
       dayClosed={stock.status === "closed"}
@@ -128,6 +131,7 @@ function readPerCase(line: Line): number | null {
 function OrderFlow({
   today,
   products,
+  groups,
   clients,
   stockRows,
   dayClosed,
@@ -136,6 +140,7 @@ function OrderFlow({
 }: {
   today: string;
   products: Doc<"products">[];
+  groups: Doc<"productGroups">[];
   clients: ClientRow[];
   stockRows: StockRow[];
   dayClosed: boolean;
@@ -203,7 +208,10 @@ function OrderFlow({
     .map((product) => ({ product, line: lines[product._id] }))
     .filter(({ line }) => line && (line.quantity > 0 || line.empties > 0));
   const perCaseOf = (product: Doc<"products">, line: Line) => Math.min(readPerCase(line) ?? 0, priceOf(product));
-  const subtotal = chosen.reduce((sum, { product, line }) => sum + (priceOf(product) - perCaseOf(product, line)) * line.quantity, 0);
+  const subtotal = chosen.reduce(
+    (sum, { product, line }) => sum + lineAmount({ price: priceOf(product), discountPerCase: perCaseOf(product, line), quantity: line.quantity }),
+    0,
+  );
   const cases = chosen.reduce((sum, { line }) => sum + line.quantity, 0);
   const badDiscount = chosen.find(({ product, line }) => {
     const perCase = readPerCase(line);
@@ -434,14 +442,16 @@ function OrderFlow({
               <EmptyState title={t.flow.noProducts} action={<LinkButton to="/products">{t.stock.addProducts}</LinkButton>} />
             </Card>
           ) : (
-            (["softdrinks", "beer", "other"] as const).map((category) => {
-              const group = products.filter((p) => p.category === category && (!term || p.name.toLowerCase().includes(term)));
-              if (group.length === 0) return null;
+            productSections(
+              products.filter((p) => !term || p.name.toLowerCase().includes(term)),
+              groups,
+              { category: fmt.category, ungrouped: t.products.ungrouped },
+            ).map((section) => {
               return (
-                <Card key={category}>
-                  <p className="px-5 pt-4 text-base font-bold tracking-wide text-ink-3 uppercase sm:px-6">{fmt.category(category)}</p>
+                <Card key={section.key}>
+                  <p className="px-5 pt-4 text-base font-bold tracking-wide text-ink-3 uppercase sm:px-6">{section.title}</p>
                   <ul className="divide-y divide-line">
-                    {group.map((product) => (
+                    {section.products.map((product) => (
                       <ProductLine
                         key={product._id}
                         product={product}
@@ -864,7 +874,7 @@ function ProductLine({
           {quantity > available && <p className="text-base font-semibold text-[#B42318]">{t.flow.onlyLeft(Math.max(available, 0))}</p>}
         </div>
         <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:flex-col sm:items-end">
-          <Stepper value={quantity} onChange={(q) => onChange({ quantity: q })} max={Math.max(available, quantity)} label={product.name} />
+          <Stepper half value={quantity} onChange={(q) => onChange({ quantity: q })} max={Math.max(available, quantity)} label={product.name} />
           {quantity > 0 && (
             <span className="text-lg font-bold tabular">{fmt.money((price - Math.min(perCase ?? 0, price)) * quantity)}</span>
           )}
@@ -876,6 +886,7 @@ function ProductLine({
             <div className="flex flex-wrap items-center justify-between gap-3 py-2.5 sm:justify-end">
               <span className="text-base font-semibold text-ink-2">{t.flow.emptiesReturned}</span>
               <Stepper
+                half
                 size="sm"
                 value={empties}
                 onChange={(e) => onChange({ empties: e, emptiesTouched: true })}

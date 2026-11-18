@@ -40,6 +40,20 @@ export function requireWholeNumber(value: number, label: Label, { min = 0 } = {}
   }
 }
 
+// Cases can be whole or half (12 or 12.5), nothing finer.
+export function isHalfStep(value: number) {
+  return Number.isInteger(value * 2);
+}
+
+export function requireCases(value: number, label: Label, { min = 0 } = {}) {
+  if (!isHalfStep(value) || value < min) {
+    fail(
+      `${label[0]} must be whole or half cases, like 12 or 12.5${min > 0 ? `, and at least ${min}` : ""}.`,
+      `Ang ${label[1]} ay dapat buo o kalahating kaha, halimbawa 12 o 12.5${min > 0 ? `, at hindi bababa sa ${min}` : ""}.`,
+    );
+  }
+}
+
 export function cleanText(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;

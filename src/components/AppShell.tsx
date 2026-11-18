@@ -20,6 +20,7 @@ import {
   Settings,
   Type,
   Users,
+  Wallet,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -74,6 +75,7 @@ export default function AppShell() {
     { to: "/inventory", label: t.nav.stock, icon: Boxes },
     { to: "/suppliers/coke", label: t.nav.coke, icon: CupSoda },
     { to: "/suppliers/san-miguel", label: t.nav.sanMiguel, icon: Beer },
+    { to: "/payroll", label: t.nav.payroll, icon: Wallet },
     { to: "/reports", label: t.nav.reports, icon: BarChart3 },
     { to: "/products", label: t.nav.products, icon: Package },
   ];
@@ -521,6 +523,7 @@ function AccountMenu() {
   const items = [
     { to: "/suppliers/coke", label: t.nav.coke, icon: CupSoda, mobileOnly: true },
     { to: "/suppliers/san-miguel", label: t.nav.sanMiguel, icon: Beer, mobileOnly: true },
+    { to: "/payroll", label: t.nav.payroll, icon: Wallet, mobileOnly: true },
     { to: "/reports", label: t.nav.reports, icon: BarChart3, mobileOnly: true },
     { to: "/products", label: t.nav.products, icon: Package, mobileOnly: true },
     { to: "/settings", label: t.nav.settings, icon: Settings, mobileOnly: false },

@@ -21,7 +21,7 @@ export function discountAmount(
 
 // What one order line costs after its per-case discount.
 export function lineAmount(item: { price: number; quantity: number; discountPerCase?: number }): number {
-  return (item.price - (item.discountPerCase ?? 0)) * item.quantity;
+  return Math.round((item.price - (item.discountPerCase ?? 0)) * item.quantity);
 }
 
 type Deposits = { depositCases?: number; refundCases?: number; depositPerCase?: number };

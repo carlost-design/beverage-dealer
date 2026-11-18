@@ -1,7 +1,7 @@
 import { v, type Infer } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
-import { cleanText, currentUser, fail, logActivity, requireUser, requireWholeNumber } from "./lib/access";
+import { cleanText, currentUser, fail, isHalfStep, logActivity, requireCases, requireUser, requireWholeNumber } from "./lib/access";
 import { manilaDate } from "./lib/dates";
 import { formatPeso } from "./lib/money";
 import { lateInfo, openOrders, openOrdersForClient } from "./lib/orders";
@@ -245,7 +245,7 @@ export const returnEmpties = mutation({
     const date = manilaDate();
     const summary = [];
     for (const item of items) {
-      requireWholeNumber(item.quantity, ["Empties", "empties"]);
+      requireCases(item.quantity, ["Empties", "empties"]);
       if (item.quantity === 0) continue;
       const product = await ctx.db.get("products", item.productId);
       if (!product?.returnable) fail("Only returnable products have empties.", "Ang mga produktong may ibinabalik na kaha lang ang may empties.");
@@ -279,8 +279,8 @@ export const adjustEmpties = mutation({
     const product = await ctx.db.get("products", productId);
     if (!client || !product) fail("Client or product not found.", "Hindi makita ang suki o ang produkto.");
     if (!product.returnable) fail("Only returnable products have empties.", "Ang mga produktong may ibinabalik na kaha lang ang may empties.");
-    if (!Number.isInteger(delta) || delta === 0) {
-      fail("Enter a whole number of cases, like 5 or -5.", "Maglagay ng buong bilang ng kaha, halimbawa 5 o -5.");
+    if (!isHalfStep(delta) || delta === 0) {
+      fail("Enter whole or half cases, like 5, 5.5 or -5.", "Maglagay ng buo o kalahating kaha, halimbawa 5, 5.5 o -5.");
     }
     const why = cleanText(note);
     if (!why) fail("Enter a reason for the adjustment.", "Ilagay ang dahilan ng pagtama.");

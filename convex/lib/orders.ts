@@ -1,7 +1,8 @@
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import { cleanText, fail, requireWholeNumber } from "./access";
+import { cleanText, fail, requireCases, requireWholeNumber } from "./access";
 import { addDays, daysBetween } from "./dates";
+import { compareProducts, groupRanks, listGroups } from "./productGroups";
 import { depositNet, discountAmount, formatPeso, lineAmount, paymentStatusFor } from "./money";
 import { availableStock, moveStock, openDay, recordEmpties } from "./stock";
 
@@ -67,8 +68,8 @@ export async function buildItems(
   const ownPrice = new Map((clientPrices ?? []).map((p) => [p.productId, p.price]));
   const merged = new Map<Id<"products">, { quantity: number; emptiesReturned: number; discountPerCase: number }>();
   for (const input of inputs) {
-    requireWholeNumber(input.quantity, ["Quantity", "dami"]);
-    requireWholeNumber(input.emptiesReturned, ["Empties returned", "empties na ibinalik"]);
+    requireCases(input.quantity, ["Quantity", "dami"]);
+    requireCases(input.emptiesReturned, ["Empties returned", "empties na ibinalik"]);
     requireWholeNumber(input.discountPerCase ?? 0, ["Discount", "discount"]);
     const line = merged.get(input.productId) ?? { quantity: 0, emptiesReturned: 0, discountPerCase: 0 };
     merged.set(input.productId, {
@@ -78,7 +79,7 @@ export async function buildItems(
     });
   }
 
-  const items: OrderItem[] = [];
+  const items: (OrderItem & { groupId?: Id<"productGroups"> })[] = [];
   for (const [productId, line] of merged) {
     const product = await ctx.db.get("products", productId);
     if (!product) fail("A product in this order no longer exists.", "Wala na ang isang produkto sa order na ito.");
@@ -101,12 +102,15 @@ export async function buildItems(
       returnable: product.returnable,
       emptiesReturned,
       discountPerCase: line.discountPerCase > 0 ? line.discountPerCase : undefined,
+      groupId: product.groupId,
     });
   }
   if (!items.some((item) => item.quantity > 0)) {
     fail("Add at least one case to the order.", "Magdagdag ng kahit isang kaha sa order.");
   }
-  return items;
+  // Saved in group order (all Kasalo, then all C8…) so receipts list them that way.
+  items.sort(compareProducts(groupRanks(await listGroups(ctx))));
+  return items.map(({ groupId: _groupId, ...item }) => item);
 }
 
 type OrderDiscount = NonNullable<Doc<"orders">["discount"]>;

@@ -2,6 +2,7 @@ import { ChevronLeft, Loader2, Minus, Plus, Search, TrendingDown, TrendingUp, X 
 import {
   useEffect,
   useId,
+  useState,
   type ButtonHTMLAttributes,
   type ComponentType,
   type HTMLAttributes,
@@ -589,22 +590,31 @@ export function Stepper({
   max,
   label,
   size = "md",
+  half = false,
 }: {
   value: number;
   onChange: (value: number) => void;
   max?: number;
   label: string;
   size?: "sm" | "md";
+  // Also takes half cases: type 12.5. The buttons still add or take off 1.
+  half?: boolean;
 }) {
   const t = useT();
+  // What is typed, while it is being typed, so "12." stays on screen.
+  const [draft, setDraft] = useState<string | null>(null);
   const clamp = (n: number) => Math.max(0, max === undefined ? n : Math.min(n, max));
   const button = size === "sm" ? "size-10" : "size-12";
+  const step = (n: number) => {
+    setDraft(null);
+    onChange(clamp(n));
+  };
   return (
     <div className="inline-flex items-center gap-1 rounded-full border border-line-strong bg-white p-1 shadow-xs">
       <button
         type="button"
         aria-label={`${t.common.less}: ${label}`}
-        onClick={() => onChange(clamp(value - 1))}
+        onClick={() => step(value - 1)}
         disabled={value <= 0}
         className={cx(
           "flex items-center justify-center rounded-full bg-gray-100 text-ink hover:bg-gray-200 active:bg-gray-300 disabled:bg-gray-50 disabled:text-gray-300",
@@ -615,23 +625,34 @@ export function Stepper({
       </button>
       <input
         aria-label={label}
-        inputMode="numeric"
-        value={value === 0 ? "" : String(value)}
+        inputMode={half ? "decimal" : "numeric"}
+        value={draft ?? (value === 0 ? "" : String(value))}
         placeholder="0"
         onChange={(e) => {
-          const digits = e.target.value.replace(/\D/g, "");
-          onChange(clamp(digits === "" ? 0 : parseInt(digits, 10)));
+          if (!half) {
+            const digits = e.target.value.replace(/\D/g, "");
+            onChange(clamp(digits === "" ? 0 : parseInt(digits, 10)));
+            return;
+          }
+          // Whole cases or .5 only: "12", "12.", "12.5" (a comma counts as the point).
+          const typed = e.target.value.replace(",", ".").replace(/[^\d.]/g, "");
+          if (!/^\d*(\.[05]?)?$/.test(typed)) return;
+          const number = typed === "" || typed === "." ? 0 : parseFloat(typed);
+          const next = clamp(number);
+          setDraft(next === number ? typed : null);
+          onChange(next);
         }}
         onFocus={(e) => e.target.select()}
+        onBlur={() => setDraft(null)}
         className={cx(
           "bg-transparent text-center font-bold text-ink tabular placeholder:text-gray-400 focus:outline-none",
-          size === "sm" ? "w-12 text-lg" : "w-14 text-xl",
+          size === "sm" ? (half ? "w-14 text-lg" : "w-12 text-lg") : half ? "w-16 text-xl" : "w-14 text-xl",
         )}
       />
       <button
         type="button"
         aria-label={`${t.common.more}: ${label}`}
-        onClick={() => onChange(clamp(value + 1))}
+        onClick={() => step(value + 1)}
         disabled={max !== undefined && value >= max}
         className={cx(
           "flex items-center justify-center rounded-full bg-brand text-white hover:bg-brand-strong active:bg-brand-strong disabled:bg-gray-100 disabled:text-gray-300",

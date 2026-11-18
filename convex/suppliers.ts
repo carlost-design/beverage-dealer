@@ -1,8 +1,10 @@
 import { v } from "convex/values";
+import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import { cleanText, currentUser, fail, logActivity, requireUser, requireWholeNumber } from "./lib/access";
 import { isValidDate, manilaDate } from "./lib/dates";
-import { formatPeso } from "./lib/money";
+import { formatPeso, lineAmount } from "./lib/money";
+import { compareProducts, groupRanks, listGroups } from "./lib/productGroups";
 import { recordStockIn } from "./lib/stock";
 import { checkWarning, computePurchase, supplierOf } from "./lib/suppliers";
 import { checkStatus, supplierKey } from "./schema";
@@ -191,5 +193,52 @@ export const checkWarnings = query({
       .map((check) => ({ ...check, warning: checkWarning(check, today) }))
       .filter((check) => check.warning !== null)
       .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  },
+});
+
+// What was sold of this supplier's products on a day, from that day's orders
+// (cancelled orders left out): cases and amount per product, and the totals.
+export const salesByDay = query({
+  args: { supplier: supplierKey, date: v.string() },
+  handler: async (ctx, { supplier, date }) => {
+    if (!(await currentUser(ctx))) return null;
+    if (!isValidDate(date)) fail("Choose a date.", "Pumili ng petsa.");
+    const products = await ctx.db.query("products").collect();
+    const ranks = groupRanks(await listGroups(ctx));
+    const ofSupplier = new Map(products.filter((p) => supplierOf(p) === supplier).map((p) => [p._id, p]));
+    const orders = await ctx.db
+      .query("orders")
+      .withIndex("by_date", (q) => q.eq("date", date))
+      .collect();
+    const lines = new Map<Id<"products">, { productId: Id<"products">; name: string; category: Doc<"products">["category"]; groupId?: Id<"productGroups">; cases: number; amount: number }>();
+    let orderCount = 0;
+    for (const order of orders) {
+      if (order.voided) continue;
+      let counted = false;
+      for (const item of order.items) {
+        const product = ofSupplier.get(item.productId);
+        if (!product || item.quantity === 0) continue;
+        counted = true;
+        const line = lines.get(product._id) ?? {
+          productId: product._id,
+          name: product.name,
+          category: product.category,
+          groupId: product.groupId,
+          cases: 0,
+          amount: 0,
+        };
+        line.cases += item.quantity;
+        line.amount += lineAmount(item);
+        lines.set(product._id, line);
+      }
+      if (counted) orderCount += 1;
+    }
+    const rows = [...lines.values()].sort(compareProducts(ranks));
+    return {
+      rows,
+      orders: orderCount,
+      cases: rows.reduce((sum, row) => sum + row.cases, 0),
+      amount: rows.reduce((sum, row) => sum + row.amount, 0),
+    };
   },
 });

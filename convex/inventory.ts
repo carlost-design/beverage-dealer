@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
-import { cleanText, currentUser, fail, logActivity, requireUser, requireWholeNumber } from "./lib/access";
+import { cleanText, currentUser, fail, isHalfStep, logActivity, requireCases, requireUser } from "./lib/access";
 import { manilaDate } from "./lib/dates";
 import { depositNet } from "./lib/money";
 import { dayView } from "./lib/dayView";
@@ -136,7 +136,7 @@ export const recordDamage = mutation({
   args: { productId: v.id("products"), quantity: v.number(), note: v.optional(v.string()) },
   handler: async (ctx, { productId, quantity, note }) => {
     const userId = await requireUser(ctx);
-    requireWholeNumber(quantity, ["Damaged cases", "sirang kaha"], { min: 1 });
+    requireCases(quantity, ["Damaged cases", "sirang kaha"], { min: 0.5 });
     const product = await ctx.db.get("products", productId);
     if (!product) fail("Product not found.", "Hindi makita ang produkto.");
     const date = manilaDate();
@@ -169,8 +169,8 @@ export const adjustStock = mutation({
   args: { productId: v.id("products"), delta: v.number(), note: v.string() },
   handler: async (ctx, { productId, delta, note }) => {
     const userId = await requireUser(ctx);
-    if (!Number.isInteger(delta) || delta === 0) {
-      fail("Enter a whole number of cases, like 5 or -5.", "Maglagay ng buong bilang ng kaha, halimbawa 5 o -5.");
+    if (!isHalfStep(delta) || delta === 0) {
+      fail("Enter whole or half cases, like 5, 5.5 or -5.", "Maglagay ng buo o kalahating kaha, halimbawa 5, 5.5 o -5.");
     }
     const why = cleanText(note);
     if (!why) fail("Enter a reason for the adjustment.", "Ilagay ang dahilan ng pagtama.");
@@ -199,8 +199,8 @@ export const adjustWarehouseEmpties = mutation({
   args: { productId: v.id("products"), delta: v.number(), note: v.string() },
   handler: async (ctx, { productId, delta, note }) => {
     const userId = await requireUser(ctx);
-    if (!Number.isInteger(delta) || delta === 0) {
-      fail("Enter a whole number of cases, like 5 or -5.", "Maglagay ng buong bilang ng kaha, halimbawa 5 o -5.");
+    if (!isHalfStep(delta) || delta === 0) {
+      fail("Enter whole or half cases, like 5, 5.5 or -5.", "Maglagay ng buo o kalahating kaha, halimbawa 5, 5.5 o -5.");
     }
     const why = cleanText(note);
     if (!why) fail("Enter a reason for the adjustment.", "Ilagay ang dahilan ng pagtama.");
@@ -258,7 +258,7 @@ export const closeDay = mutation({
     for (const row of rows) {
       const expected = expectedClosing(row);
       const counted = countByProduct.get(row.productId) ?? expected;
-      requireWholeNumber(counted, ["Physical count", "bilang"]);
+      requireCases(counted, ["Physical count", "bilang"]);
       await ctx.db.patch("dailyStock", row._id, { counted });
       if (counted !== expected) {
         const product = await ctx.db.get("products", row.productId);

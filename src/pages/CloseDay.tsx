@@ -95,6 +95,7 @@ function CloseDayForm({ date, rows, previousOpen }: { date: string; rows: StockR
                   </p>
                 </div>
                 <Stepper
+                  half
                   value={counted}
                   onChange={(n) => setCounts((c) => ({ ...c, [row.productId]: n }))}
                   label={t.closeDay.countedCases(row.name)}

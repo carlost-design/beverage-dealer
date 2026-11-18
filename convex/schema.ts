@@ -51,7 +51,7 @@ export const emptiesMovementType = v.union(
   v.literal("warehouse_adjustment"), // correction to warehouse empties (count, breakage)
 );
 
-// All money is stored in centavos. All quantities are whole cases.
+// All money is stored in centavos. Case quantities are whole or half cases (12.5).
 // Business dates are "YYYY-MM-DD" strings in Asia/Manila time.
 export default defineSchema({
   ...authTables,
@@ -79,6 +79,14 @@ export default defineSchema({
     // Which tracking tab it belongs to. Missing: from the category (see lib/suppliers).
     supplier: v.optional(productSupplier),
     emptyValue: v.optional(v.number()), // what the supplier takes off for each empty case returned
+    // Kasalo, C8, 1.5L…: products in a group are listed together on orders and receipts.
+    groupId: v.optional(v.id("productGroups")),
+  }),
+
+  // The groups, in the order the owner set (position, lowest first).
+  productGroups: defineTable({
+    name: v.string(),
+    position: v.number(),
   }),
 
   clients: defineTable({
@@ -285,6 +293,52 @@ export default defineSchema({
   })
     .index("by_supplier_due", ["supplier", "dueDate"])
     .index("by_status", ["status", "supplier"]),
+
+  // Payroll (Sahod tab). Pay is weekly, Monday to Sunday.
+  employees: defineTable({
+    name: v.string(),
+    active: v.boolean(),
+  }),
+
+  // A daily rate and the first day it applies. Days before it keep the old rate.
+  employeeRates: defineTable({
+    employeeId: v.id("employees"),
+    dailyRate: v.number(), // centavos per day
+    effectiveFrom: v.string(),
+  }).index("by_employee_from", ["employeeId", "effectiveFrom"]),
+
+  // Days worked: 1 = whole day, 0.5 = half day. No row = absent.
+  attendance: defineTable({
+    employeeId: v.id("employees"),
+    date: v.string(),
+    days: v.number(),
+  })
+    .index("by_employee_date", ["employeeId", "date"])
+    .index("by_date", ["date"]),
+
+  cashAdvances: defineTable({
+    employeeId: v.id("employees"),
+    date: v.string(),
+    amount: v.number(),
+    note: v.optional(v.string()),
+  })
+    .index("by_employee_date", ["employeeId", "date"])
+    .index("by_date", ["date"]),
+
+  // A week's pay, saved when it is paid out: pay − cash advances − last
+  // week's utang. Anything still owed carries over to the next week.
+  payslips: defineTable({
+    employeeId: v.id("employees"),
+    weekStart: v.string(), // the Monday
+    days: v.number(),
+    gross: v.number(), // days × daily rate
+    advances: v.number(), // cash advances this week
+    previousDebt: v.number(), // utang carried over from the week before
+    paidOut: v.number(), // handed to the worker
+    carryOver: v.number(), // utang left, taken off next week's pay
+  })
+    .index("by_employee_week", ["employeeId", "weekStart"])
+    .index("by_week", ["weekStart"]),
 
   counters: defineTable({
     name: v.string(),
