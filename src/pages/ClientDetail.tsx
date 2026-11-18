@@ -412,7 +412,7 @@ function ReturnEmptiesModal({
                 <p className="text-lg font-semibold text-ink">{product.name}</p>
                 {(owed[product._id] ?? 0) > 0 && <p className="text-base text-ink-3">{t.clients.owesN(owed[product._id])}</p>}
               </div>
-              <Stepper value={counts[product._id] ?? 0} onChange={(n) => setCounts((c) => ({ ...c, [product._id]: n }))} label={product.name} />
+              <Stepper half value={counts[product._id] ?? 0} onChange={(n) => setCounts((c) => ({ ...c, [product._id]: n }))} label={product.name} />
             </li>
           ))}
         </ul>
@@ -484,7 +484,7 @@ function AdjustEmptiesModal({
           ]}
         />
         <Field label={t.damage.cases}>
-          <Stepper value={quantity} onChange={setQuantity} label={t.damage.cases} />
+          <Stepper half value={quantity} onChange={setQuantity} label={t.damage.cases} />
         </Field>
         <Field label={t.common.reason} hint={t.clients.adjustReasonHint}>
           <Input value={note} onChange={(e) => setNote(e.target.value)} />

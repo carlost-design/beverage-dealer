@@ -515,11 +515,11 @@ function AdjustStockModal({
         />
         {kind === "count" ? (
           <Field label={t.adjustStock.countLabel} hint={t.adjustStock.difference(delta)}>
-            <Stepper value={count} onChange={setCount} label={t.adjustStock.countLabel} />
+            <Stepper half value={count} onChange={setCount} label={t.adjustStock.countLabel} />
           </Field>
         ) : (
           <Field label={t.damage.cases}>
-            <Stepper value={quantity} onChange={setQuantity} max={kind === "add" ? undefined : inStock} label={t.damage.cases} />
+            <Stepper half value={quantity} onChange={setQuantity} max={kind === "add" ? undefined : inStock} label={t.damage.cases} />
           </Field>
         )}
         <Field label={t.common.reason} hint={t.damage.reasonHintOther}>
@@ -599,7 +599,7 @@ function DamageModal({
           </Select>
         </Field>
         <Field label={t.damage.cases}>
-          <Stepper value={quantity} onChange={setQuantity} max={kind === "add" ? undefined : inStock} label={t.damage.cases} />
+          <Stepper half value={quantity} onChange={setQuantity} max={kind === "add" ? undefined : inStock} label={t.damage.cases} />
         </Field>
         <Field label={t.common.reason} hint={kind === "damage" ? t.damage.reasonHintDamaged : t.damage.reasonHintOther}>
           <Input value={note} onChange={(e) => setNote(e.target.value)} />
@@ -665,7 +665,7 @@ function WarehouseEmptiesModal({ products, onClose }: { products: Doc<"products"
           ]}
         />
         <Field label={t.damage.cases}>
-          <Stepper value={quantity} onChange={setQuantity} label={t.damage.cases} />
+          <Stepper half value={quantity} onChange={setQuantity} label={t.damage.cases} />
         </Field>
         <Field label={t.common.reason} hint={t.warehouseEmpties.reasonHint}>
           <Input value={note} onChange={(e) => setNote(e.target.value)} />

@@ -14,6 +14,7 @@ import Login from "./pages/Login";
 import NewOrder from "./pages/NewOrder";
 import OrderDetail from "./pages/OrderDetail";
 import Orders from "./pages/Orders";
+import Payroll from "./pages/Payroll";
 import Products from "./pages/Products";
 import ReceivePayment from "./pages/ReceivePayment";
 import Reports from "./pages/Reports";
@@ -39,6 +40,7 @@ export default function App() {
           <Route element={<AppShell />}>
             <Route index element={<Home />} />
             <Route path="reports" element={<Reports />} />
+            <Route path="payroll" element={<Payroll />} />
             <Route path="orders" element={<Orders />} />
             <Route path="orders/new" element={<NewOrder />} />
             <Route path="orders/:orderId" element={<OrderDetail />} />

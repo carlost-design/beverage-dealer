@@ -5,8 +5,9 @@ import { toast } from "sonner";
 import { api } from "../../convex/_generated/api";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
 import { computePurchase, type SupplierKey } from "../../convex/lib/suppliers";
+import { DateNav } from "../components/DateNav";
 import { ProductTile } from "../components/ProductTile";
-import { Button, Card, CardHeader, Chip, Field, Input, Modal, PageHeader, PageLoading, PesoInput, Stepper } from "../components/ui";
+import { Button, Card, CardHeader, Chip, Field, Input, Modal, PageHeader, PageLoading, PesoInput, Spinner, Stepper } from "../components/ui";
 import { useErrorMessage, useFmt, useT } from "../i18n";
 import { cx, parsePeso, pesoInput } from "../lib/format";
 import { useToday } from "../lib/useToday";
@@ -57,6 +58,7 @@ export default function SupplierTracking({ supplier }: { supplier: SupplierKey }
       />
 
       <div className="space-y-5">
+        <SalesCard supplier={supplier} />
         {supplier === "sanMiguel" && <ChecksCard checks={data.checks} onAdd={() => setAddingCheck(true)} />}
         <Card>
           <CardHeader title={t.suppliers.purchasesTitle} />
@@ -124,6 +126,52 @@ export default function SupplierTracking({ supplier }: { supplier: SupplierKey }
         {null}
       </Modal>
     </>
+  );
+}
+
+// How much of this supplier's products were sold on a day, per product.
+function SalesCard({ supplier }: { supplier: SupplierKey }) {
+  const t = useT();
+  const fmt = useFmt();
+  const today = useToday();
+  const [date, setDate] = useState(today);
+  const sales = useQuery(api.suppliers.salesByDay, { supplier, date });
+  const name = t.suppliers.names[supplier];
+  return (
+    <Card>
+      <CardHeader title={t.suppliers.salesTitle(name)} description={t.suppliers.salesHint} />
+      <div className="px-5 pb-4 sm:px-6">
+        <DateNav date={date} today={today} onChange={setDate} />
+      </div>
+      {sales === undefined ? (
+        <div className="px-6 pb-6">
+          <Spinner />
+        </div>
+      ) : !sales || sales.rows.length === 0 ? (
+        <p className="px-6 pb-6 text-base text-ink-3">{t.suppliers.noSales(name)}</p>
+      ) : (
+        <>
+          <ul className="divide-y divide-line px-5 sm:px-6">
+            {sales.rows.map((row) => (
+              <li key={row.productId} className="flex items-center gap-3 py-3">
+                <ProductTile category={row.category} size="sm" />
+                <p className="min-w-0 flex-1 truncate text-lg font-semibold text-ink">{row.name}</p>
+                <span className="text-lg font-bold tabular">{t.common.cases(row.cases)}</span>
+                <span className="w-28 text-right text-lg text-ink-2 tabular">{fmt.money(row.amount)}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-line bg-brand-soft px-5 py-4 sm:px-6">
+            <div className="min-w-0 flex-1">
+              <p className="text-xl font-bold text-ink">{t.suppliers.salesTotal}</p>
+              <p className="text-base text-ink-3">{t.suppliers.salesOrders(sales.orders)}</p>
+            </div>
+            <span className="text-xl font-bold tabular">{t.common.cases(sales.cases)}</span>
+            <span className="w-28 text-right text-xl font-bold tabular">{fmt.money(sales.amount)}</span>
+          </div>
+        </>
+      )}
+    </Card>
   );
 }
 

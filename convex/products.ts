@@ -1,8 +1,10 @@
 import { v, type Infer } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import { mutation, query, type QueryCtx } from "./_generated/server";
 import { cleanText, currentUser, fail, logActivity, requireUser, requireWholeNumber } from "./lib/access";
 import { manilaDate } from "./lib/dates";
 import { formatPeso } from "./lib/money";
+import { compareProducts, groupRanks, listGroups } from "./lib/productGroups";
 import { moveStock, openDay, recordEmpties } from "./lib/stock";
 import { productCategory, productSupplier } from "./schema";
 
@@ -15,6 +17,7 @@ const productFields = v.object({
   lowStockLevel: v.number(),
   supplier: v.optional(productSupplier),
   emptyValue: v.optional(v.number()),
+  groupId: v.optional(v.id("productGroups")),
 });
 
 function cleanProduct(input: Infer<typeof productFields>) {
@@ -27,17 +30,24 @@ function cleanProduct(input: Infer<typeof productFields>) {
   return { ...input, name };
 }
 
+async function requireGroup(ctx: QueryCtx, groupId: Id<"productGroups"> | undefined) {
+  if (groupId && !(await ctx.db.get("productGroups", groupId))) {
+    fail("That group no longer exists. Choose another.", "Wala na ang group na iyon. Pumili ng iba.");
+  }
+}
+
 export const list = query({
   args: {},
   handler: async (ctx) => {
     if (!(await currentUser(ctx))) return null;
     const products = await ctx.db.query("products").collect();
-    return products.sort(
-      (a, b) =>
-        Number(b.active) - Number(a.active) ||
-        a.category.localeCompare(b.category) ||
-        a.name.localeCompare(b.name),
-    );
+    const groups = await listGroups(ctx);
+    // With no groups yet, products follow their category, as before.
+    const byGroup = groups.length
+      ? compareProducts(groupRanks(groups))
+      : (a: (typeof products)[number], b: (typeof products)[number]) =>
+          a.category.localeCompare(b.category) || a.name.localeCompare(b.name);
+    return products.sort((a, b) => Number(b.active) - Number(a.active) || byGroup(a, b));
   },
 });
 
@@ -46,6 +56,7 @@ export const create = mutation({
   handler: async (ctx, { product, openingStock, openingEmpties }) => {
     const userId = await requireUser(ctx);
     const fields = cleanProduct(product);
+    await requireGroup(ctx, fields.groupId);
     requireWholeNumber(openingStock, ["Current stock", "kasalukuyang stock"]);
     requireWholeNumber(openingEmpties, ["Empties on hand", "empties sa bodega"]);
     const duplicate = (await ctx.db.query("products").collect()).find(
@@ -94,7 +105,9 @@ export const update = mutation({
     const existing = await ctx.db.get("products", productId);
     if (!existing) fail("Product not found.", "Hindi makita ang produkto.");
     const fields = cleanProduct(product);
-    await ctx.db.patch("products", productId, fields);
+    await requireGroup(ctx, fields.groupId);
+    // Sent without a group: clear it.
+    await ctx.db.patch("products", productId, { ...fields, groupId: fields.groupId });
 
     const changes = [];
     if (existing.price !== fields.price) {
